@@ -1,10 +1,10 @@
 ﻿use std::fs::{File, OpenOptions};
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::Instant;
 
 use crate::config::AppConfig;
-use crate::core_logic;
+use crate::core_logic::{self, DiagnosisReport, DriveHealthStatus};
 
 pub struct DriveInspector {
     file_path: String,
@@ -122,11 +122,14 @@ impl DriveInspector {
         Ok(current_offset)
     }
 
-    pub fn run_verify_phase(&self, total_bytes: u64) -> io::Result<bool> {
+    pub fn run_verify_phase(&self, total_bytes: u64) -> io::Result<DiagnosisReport> {
         let mut file = File::open(&self.file_path)?;
         let mut buffer = vec![0u8; self.block_size];
         let mut current_offset: u64 = 0;
-        let mut error_count: u64 = 0;
+        let mut mismatch_blocks: u64 = 0;
+        let mut read_error_blocks: u64 = 0;
+        let mut valid_bytes: u64 = 0;
+        let mut sample_status: Option<DriveHealthStatus> = None;
         let mut last_log_time = Instant::now();
 
         println!("[INFO] Verify phase start. Total Bytes={}", total_bytes);
@@ -139,22 +142,68 @@ impl DriveInspector {
             match file.read_exact(target_buf) {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("[ERROR] Read failed at offset {}: {}", current_offset, e);
-                    return Err(e);
+                    if read_error_blocks < 5 {
+                        println!(
+                            "[ERROR] Read failed at offset {}: {}. Skipping block.",
+                            current_offset, e
+                        );
+                    }
+                    read_error_blocks += 1;
+                    if let Err(seek_err) =
+                        file.seek(SeekFrom::Start(current_offset + read_len as u64))
+                    {
+                        println!(
+                            "[ERROR] Unable to seek past read failure at offset {}: {}",
+                            current_offset, seek_err
+                        );
+                        break;
+                    }
+                    current_offset += read_len as u64;
+                    continue;
                 }
             }
 
             match core_logic::verify_block(current_offset, target_buf) {
-                Ok(_) => {}
+                Ok(_) => {
+                    valid_bytes += read_len as u64;
+                }
                 Err(bad_idx) => {
                     let global_pos = current_offset + bad_idx as u64;
-                    if error_count < 10 {
+                    if mismatch_blocks < 5 {
                         println!(
                             "[FAILURE] Mismatch at offset 0x{:X} ({}).",
                             global_pos, global_pos
                         );
                     }
-                    error_count += 1;
+                    mismatch_blocks += 1;
+
+                    let mut expected = vec![0u8; read_len];
+                    core_logic::fill_block(current_offset, &mut expected);
+                    if let Some(status) =
+                        core_logic::analyze_failure_sample(&expected, target_buf)
+                    {
+                        let replace = match sample_status {
+                            None => true,
+                            Some(existing) => {
+                                let existing_severity = match existing {
+                                    DriveHealthStatus::Healthy => 0,
+                                    DriveHealthStatus::PhysicalCorruption => 1,
+                                    DriveHealthStatus::DataLoss => 2,
+                                    DriveHealthStatus::FakeCapacity => 3,
+                                };
+                                let new_severity = match status {
+                                    DriveHealthStatus::Healthy => 0,
+                                    DriveHealthStatus::PhysicalCorruption => 1,
+                                    DriveHealthStatus::DataLoss => 2,
+                                    DriveHealthStatus::FakeCapacity => 3,
+                                };
+                                new_severity > existing_severity
+                            }
+                        };
+                        if replace {
+                            sample_status = Some(status);
+                        }
+                    }
                 }
             }
 
@@ -162,17 +211,26 @@ impl DriveInspector {
 
             if last_log_time.elapsed().as_secs() >= 2 {
                 let percent = (current_offset as f64 / total_bytes as f64) * 100.0;
-                println!("[PROGRESS] {:.1}% (errors: {})", percent, error_count);
+                let total_errors = mismatch_blocks + read_error_blocks;
+                println!("[PROGRESS] {:.1}% (errors: {})", percent, total_errors);
                 last_log_time = Instant::now();
             }
         }
 
-        if error_count > 0 {
-            println!("[RESULT] Verify failed: {} errors.", error_count);
-            Ok(false)
-        } else {
-            println!("[RESULT] Verify ok: data matches.");
-            Ok(true)
-        }
+        let report = core_logic::generate_report(
+            total_bytes,
+            current_offset,
+            valid_bytes,
+            mismatch_blocks,
+            read_error_blocks,
+            sample_status,
+        );
+
+        println!(
+            "[RESULT] Verify complete: status={:?}, errors={}.",
+            report.status, report.error_count
+        );
+
+        Ok(report)
     }
 }

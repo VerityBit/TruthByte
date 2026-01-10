@@ -3,11 +3,12 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use crate::config::AppConfig;
+use crate::core_logic::{DiagnosisReport, DriveHealthStatus};
 use crate::io_controller::DriveInspector;
 
 pub struct RunOutcome {
     pub bytes_written: u64,
-    pub valid: bool,
+    pub report: DiagnosisReport,
 }
 
 #[derive(Debug)]
@@ -44,19 +45,49 @@ pub fn run_write_verify(
         .run_write_phase(limit_mb)
         .map_err(RunError::Write)?;
     if bytes_written == 0 {
+        let report = DiagnosisReport {
+            total_capacity: 0,
+            tested_bytes: 0,
+            valid_bytes: 0,
+            error_count: 0,
+            health_score: 0.0,
+            status: DriveHealthStatus::DataLoss,
+            conclusion: "No data written; verification skipped.".to_string(),
+        };
         return Ok(RunOutcome {
             bytes_written,
-            valid: false,
+            report,
         });
     }
 
-    let valid = inspector
+    let report = inspector
         .run_verify_phase(bytes_written)
         .map_err(RunError::Verify)?;
     Ok(RunOutcome {
         bytes_written,
-        valid,
+        report,
     })
+}
+
+pub fn print_diagnostic_summary(report: &DiagnosisReport) {
+    let tested_mb = report.tested_bytes as f64 / (1024.0 * 1024.0);
+    let valid_mb = report.valid_bytes as f64 / (1024.0 * 1024.0);
+    let total_mb = report.total_capacity as f64 / (1024.0 * 1024.0);
+    let status_label = match report.status {
+        DriveHealthStatus::Healthy => "Healthy",
+        DriveHealthStatus::FakeCapacity => "FakeCapacity",
+        DriveHealthStatus::PhysicalCorruption => "PhysicalCorruption",
+        DriveHealthStatus::DataLoss => "DataLoss",
+    };
+
+    println!("========================================");
+    println!("TruthByte Diagnostic Summary");
+    println!("Health Score : {:.1} / 100.0", report.health_score);
+    println!("Tested/Valid : {:.1} / {:.1} MB", tested_mb, valid_mb);
+    println!("Total Target : {:.1} MB", total_mb);
+    println!("Status       : {}", status_label);
+    println!("Conclusion   : {}", report.conclusion);
+    println!("========================================");
 }
 
 pub fn run_cli(args: &[String]) -> i32 {
@@ -131,7 +162,12 @@ pub fn run_cli(args: &[String]) -> i32 {
                 return 2;
             }
 
-            if outcome.valid { 0 } else { 1 }
+            print_diagnostic_summary(&outcome.report);
+            if outcome.report.status == DriveHealthStatus::Healthy {
+                0
+            } else {
+                1
+            }
         }
         Err(RunError::Write(e)) => {
             println!("[ERROR] Write phase failed: {}", e);
