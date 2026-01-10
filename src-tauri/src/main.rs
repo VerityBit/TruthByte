@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use truthbyte::{
     AppConfig, DiagnosisReport, DriveHealthStatus, DriveInspector, EventSink, ProgressUpdate,
 };
@@ -19,7 +19,7 @@ struct AppState {
     cancel_flag: Arc<AtomicBool>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct ErrorPayload {
     message: String,
 }
@@ -135,6 +135,7 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![start_diagnosis, stop_diagnosis])
+        .plugin(tauri_plugin_dialog::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

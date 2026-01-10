@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { save } from "@tauri-apps/api/dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import {
   DiagnosisReport,
   ProgressUpdate,
