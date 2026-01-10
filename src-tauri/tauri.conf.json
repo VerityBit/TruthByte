@@ -1,0 +1,19 @@
+{
+  "productName": "TruthByte",
+  "version": "0.1.0",
+  "identifier": "com.veritybit.truthbyte",
+  "build": {
+    "devPath": "http://localhost:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "TruthByte",
+        "width": 1100,
+        "height": 720,
+        "resizable": true
+      }
+    ]
+  }
+}

@@ -1,10 +1,36 @@
-﻿use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::{self, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
+
+use serde::Serialize;
 
 use crate::config::AppConfig;
 use crate::core_logic::{self, DiagnosisReport, DriveHealthStatus};
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProgressPhase {
+    Write,
+    Verify,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProgressUpdate {
+    pub phase: ProgressPhase,
+    pub percent: f64,
+    pub speed_mbps: f64,
+    pub bytes_written: u64,
+    pub bytes_verified: u64,
+    pub total_bytes: u64,
+}
+
+pub trait EventSink: Send + Sync {
+    fn progress(&self, update: ProgressUpdate);
+    fn error(&self, message: String);
+}
 
 pub struct DriveInspector {
     file_path: String,
@@ -24,6 +50,15 @@ impl DriveInspector {
     }
 
     pub fn run_write_phase(&self, limit_mb: u64) -> io::Result<u64> {
+        self.run_write_phase_with_events(limit_mb, None, None)
+    }
+
+    pub fn run_write_phase_with_events(
+        &self,
+        limit_mb: u64,
+        cancel_flag: Option<Arc<AtomicBool>>,
+        sink: Option<&dyn EventSink>,
+    ) -> io::Result<u64> {
         let path = Path::new(&self.file_path);
 
         if let Some(parent) = path.parent() {
@@ -39,7 +74,14 @@ impl DriveInspector {
             .write(true)
             .create(true)
             .truncate(true)
-            .open(path)?;
+            .open(path)
+            .map_err(|e| {
+                emit_error(
+                    sink,
+                    format!("Unable to open target for writing: {}", e),
+                );
+                e
+            })?;
 
         let mut buffer = vec![0u8; self.block_size];
         let mut current_offset: u64 = 0;
@@ -48,8 +90,10 @@ impl DriveInspector {
         } else {
             limit_mb * 1024 * 1024
         };
+        let total_bytes = if limit_mb == 0 { 0 } else { limit_bytes };
         let start_time = Instant::now();
         let mut last_log_time = Instant::now();
+        let mut last_emit_time = Instant::now();
 
         println!(
             "[INFO] Write phase start. Target={}, Limit={}MB",
@@ -57,7 +101,8 @@ impl DriveInspector {
         );
 
         let mut stop_due_to_full = false;
-        loop {
+        while current_offset < limit_bytes && !should_cancel(&cancel_flag) {
+
             let remaining = limit_bytes.saturating_sub(current_offset);
             if remaining == 0 {
                 break;
@@ -85,6 +130,10 @@ impl DriveInspector {
                             stop_due_to_full = true;
                             break;
                         }
+                        emit_error(
+                            sink,
+                            format!("Write failure at offset {}: {}", current_offset, e),
+                        );
                         return Err(e);
                     }
                 }
@@ -99,10 +148,28 @@ impl DriveInspector {
                 println!("[PROGRESS] Written {} MB", mb_written);
                 last_log_time = Instant::now();
             }
+
+            if last_emit_time.elapsed().as_millis() >= 500 {
+                emit_progress(
+                    sink,
+                    ProgressUpdate {
+                        phase: ProgressPhase::Write,
+                        percent: percent_of(current_offset, total_bytes),
+                        speed_mbps: speed_mbps(current_offset, start_time),
+                        bytes_written: current_offset,
+                        bytes_verified: 0,
+                        total_bytes,
+                    },
+                );
+                last_emit_time = Instant::now();
+            }
         }
 
         println!("[INFO] Syncing data...");
-        file.sync_all()?;
+        if let Err(e) = file.sync_all() {
+            emit_error(sink, format!("Failed to sync data: {}", e));
+            return Err(e);
+        }
 
         let duration = start_time.elapsed();
         let mb_total = current_offset / 1024 / 1024;
@@ -119,11 +186,35 @@ impl DriveInspector {
             speed
         );
 
+        emit_progress(
+            sink,
+            ProgressUpdate {
+                phase: ProgressPhase::Write,
+                percent: percent_of(current_offset, total_bytes),
+                speed_mbps: speed_mbps(current_offset, start_time),
+                bytes_written: current_offset,
+                bytes_verified: 0,
+                total_bytes,
+            },
+        );
+
         Ok(current_offset)
     }
 
     pub fn run_verify_phase(&self, total_bytes: u64) -> io::Result<DiagnosisReport> {
-        let mut file = File::open(&self.file_path)?;
+        self.run_verify_phase_with_events(total_bytes, None, None)
+    }
+
+    pub fn run_verify_phase_with_events(
+        &self,
+        total_bytes: u64,
+        cancel_flag: Option<Arc<AtomicBool>>,
+        sink: Option<&dyn EventSink>,
+    ) -> io::Result<DiagnosisReport> {
+        let mut file = File::open(&self.file_path).map_err(|e| {
+            emit_error(sink, format!("Unable to open target for reading: {}", e));
+            e
+        })?;
         let mut buffer = vec![0u8; self.block_size];
         let mut current_offset: u64 = 0;
         let mut mismatch_blocks: u64 = 0;
@@ -131,10 +222,13 @@ impl DriveInspector {
         let mut valid_bytes: u64 = 0;
         let mut sample_status: Option<DriveHealthStatus> = None;
         let mut last_log_time = Instant::now();
+        let mut last_emit_time = Instant::now();
+        let start_time = Instant::now();
 
         println!("[INFO] Verify phase start. Total Bytes={}", total_bytes);
 
-        while current_offset < total_bytes {
+        while current_offset < total_bytes && !should_cancel(&cancel_flag) {
+
             let remaining = total_bytes - current_offset;
             let read_len = std::cmp::min(remaining, self.block_size as u64) as usize;
             let target_buf = &mut buffer[0..read_len];
@@ -152,9 +246,12 @@ impl DriveInspector {
                     if let Err(seek_err) =
                         file.seek(SeekFrom::Start(current_offset + read_len as u64))
                     {
-                        println!(
-                            "[ERROR] Unable to seek past read failure at offset {}: {}",
-                            current_offset, seek_err
+                        emit_error(
+                            sink,
+                            format!(
+                                "Unable to seek past read failure at offset {}: {}",
+                                current_offset, seek_err
+                            ),
                         );
                         break;
                     }
@@ -215,6 +312,21 @@ impl DriveInspector {
                 println!("[PROGRESS] {:.1}% (errors: {})", percent, total_errors);
                 last_log_time = Instant::now();
             }
+
+            if last_emit_time.elapsed().as_millis() >= 500 {
+                emit_progress(
+                    sink,
+                    ProgressUpdate {
+                        phase: ProgressPhase::Verify,
+                        percent: percent_of(current_offset, total_bytes),
+                        speed_mbps: speed_mbps(current_offset, start_time),
+                        bytes_written: total_bytes,
+                        bytes_verified: current_offset,
+                        total_bytes,
+                    },
+                );
+                last_emit_time = Instant::now();
+            }
         }
 
         let report = core_logic::generate_report(
@@ -231,6 +343,53 @@ impl DriveInspector {
             report.status, report.error_count
         );
 
+        emit_progress(
+            sink,
+            ProgressUpdate {
+                phase: ProgressPhase::Verify,
+                percent: percent_of(current_offset, total_bytes),
+                speed_mbps: speed_mbps(current_offset, start_time),
+                bytes_written: total_bytes,
+                bytes_verified: current_offset,
+                total_bytes,
+            },
+        );
+
         Ok(report)
+    }
+}
+
+fn should_cancel(cancel_flag: &Option<Arc<AtomicBool>>) -> bool {
+    cancel_flag
+        .as_ref()
+        .map(|flag| flag.load(Ordering::Relaxed))
+        .unwrap_or(false)
+}
+
+fn speed_mbps(bytes: u64, start_time: Instant) -> f64 {
+    let elapsed = start_time.elapsed().as_secs_f64();
+    if elapsed <= 0.0 {
+        return 0.0;
+    }
+    (bytes as f64 / (1024.0 * 1024.0)) / elapsed
+}
+
+fn percent_of(done: u64, total: u64) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        (done as f64 / total as f64) * 100.0
+    }
+}
+
+fn emit_progress(sink: Option<&dyn EventSink>, update: ProgressUpdate) {
+    if let Some(sink) = sink {
+        sink.progress(update);
+    }
+}
+
+fn emit_error(sink: Option<&dyn EventSink>, message: String) {
+    if let Some(sink) = sink {
+        sink.error(message);
     }
 }

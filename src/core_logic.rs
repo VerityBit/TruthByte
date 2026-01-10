@@ -1,6 +1,8 @@
 use std::num::Wrapping;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum DriveHealthStatus {
     Healthy,
     FakeCapacity,
@@ -8,7 +10,7 @@ pub enum DriveHealthStatus {
     DataLoss,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DiagnosisReport {
     pub total_capacity: u64,
     pub tested_bytes: u64,
