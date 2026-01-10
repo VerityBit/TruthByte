@@ -213,7 +213,7 @@ export default function App() {
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
-          <section className="rounded-3xl border border-ink-700/70 bg-ink-800/60 p-6 shadow-soft">
+          <section className="panel p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Configuration</h2>
               <span
@@ -246,13 +246,13 @@ export default function App() {
                 <label className="text-sm text-ink-300">Target file</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
-                    className="w-full rounded-2xl border border-ink-700 bg-ink-900/80 px-4 py-3 text-sm text-ink-50 outline-none transition focus:border-mint-500"
+                    className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
                     placeholder="Select a target file on the drive"
                     value={path}
                     onChange={(event) => setPath(event.target.value)}
                   />
                   <button
-                    className="rounded-2xl border border-ink-600 bg-ink-700/50 px-4 py-3 text-sm font-medium transition hover:border-mint-400 hover:text-mint-200"
+                    className="btn-secondary rounded-2xl px-4 py-3 text-sm font-medium"
                     onClick={handlePickPath}
                     type="button"
                   >
@@ -266,7 +266,7 @@ export default function App() {
                   Capacity limit (MB)
                 </label>
                 <input
-                  className="w-full rounded-2xl border border-ink-700 bg-ink-900/80 px-4 py-3 text-sm text-ink-50 outline-none transition focus:border-mint-500"
+                  className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
                   placeholder="Leave empty for full-capacity scan"
                   value={limitMb}
                   onChange={(event) => setLimitMb(event.target.value)}
@@ -275,14 +275,14 @@ export default function App() {
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 <button
-                  className="flex-1 rounded-2xl bg-mint-500 px-5 py-3 text-sm font-semibold text-ink-900 shadow-glow transition hover:bg-mint-400 disabled:cursor-not-allowed disabled:bg-ink-600"
+                  className="btn-primary flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
                   onClick={handleStart}
                   disabled={running}
                 >
                   Start diagnosis
                 </button>
                 <button
-                  className="flex-1 rounded-2xl border border-ember-500/60 px-5 py-3 text-sm font-semibold text-ember-300 transition hover:border-ember-400 hover:text-ember-200 disabled:cursor-not-allowed disabled:border-ink-700 disabled:text-ink-600"
+                  className="btn-danger-outline flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
                   onClick={handleStop}
                   disabled={!running}
                 >
@@ -292,7 +292,7 @@ export default function App() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-ink-700/70 bg-ink-800/60 p-6 shadow-soft">
+          <section className="panel p-6">
             <h2 className="text-xl font-semibold">Live dashboard</h2>
             {status === "cancelled" ? (
               <div className="mt-4 rounded-2xl border border-ember-500/50 bg-ember-500/10 px-4 py-3 text-sm text-ember-200">
@@ -300,14 +300,14 @@ export default function App() {
               </div>
             ) : null}
             <div className="mt-6 flex flex-col gap-6">
-              <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-4">
+              <div className="panel-card p-4">
                 <div className="flex items-center justify-between text-sm text-ink-300">
                   <span>Progress</span>
                   <span className="font-mono text-xs">
                     {phase ? phase.toUpperCase() : "STANDBY"}
                   </span>
                 </div>
-                <div className="mt-3 h-3 w-full rounded-full bg-ink-700/70">
+                <div className="progress-track mt-3 h-3 w-full rounded-full">
                   <div
                     className={`h-3 rounded-full transition-all ${progressBarClass}`}
                     style={{ width: `${displayProgress}%` }}
@@ -326,7 +326,7 @@ export default function App() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-4">
+                <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
                     Speed
                   </p>
@@ -337,7 +337,7 @@ export default function App() {
                     </span>
                   </p>
                 </div>
-                <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-4">
+                <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
                     ETA
                   </p>
@@ -345,7 +345,7 @@ export default function App() {
                     {timeFormatter(etaSeconds)}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-4">
+                <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
                     Target
                   </p>
@@ -360,7 +360,7 @@ export default function App() {
           </section>
         </div>
 
-        <section className="rounded-3xl border border-ink-700/70 bg-ink-800/60 p-6 shadow-soft">
+        <section className="panel p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Diagnosis report</h2>
             {report ? (
@@ -377,7 +377,7 @@ export default function App() {
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-            <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-5">
+            <div className="panel-card p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
                 Health score
               </p>
@@ -394,7 +394,7 @@ export default function App() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-ink-700/60 bg-ink-900/70 p-5">
+            <div className="panel-card p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
                 Error sample analysis
               </p>
@@ -424,7 +424,7 @@ export default function App() {
       </div>
 
       {toast ? (
-        <div className="fixed bottom-6 right-6 max-w-sm rounded-2xl border border-ember-500/60 bg-ink-900/90 px-4 py-3 text-sm text-ember-200 shadow-soft">
+        <div className="toast fixed bottom-6 right-6 max-w-sm rounded-2xl px-4 py-3 text-sm text-ember-200">
           {toast}
         </div>
       ) : null}
