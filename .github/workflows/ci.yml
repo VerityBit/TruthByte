@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - '.github/**'
+      - 'src-tauri/icons/**'
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - '.github/**'
+      - 'src-tauri/icons/**'
 
 jobs:
   build:
