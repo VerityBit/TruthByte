@@ -85,7 +85,7 @@ jobs:
       - name: Build App
         working-directory: .
         shell: bash
-        run: ./frontend/node_modules/.bin/tauri build
+        run: ./frontend/node_modules/.bin/tauri build --config src-tauri/tauri.conf.json
 
       - name: Debug - List Build Output
         shell: bash
@@ -101,7 +101,10 @@ jobs:
           name: truthbyte-${{ matrix.platform }}-bundle
           path: |
             src-tauri/target/release/bundle/**
-            target/release/bundle/**
+            src-tauri/target/release/*.exe
+            src-tauri/target/release/*.msi
+            src-tauri/target/release/*.deb
+            src-tauri/target/release/*.AppImage
           if-no-files-found: warn
 
       - name: Publish GitHub Release Assets
@@ -110,4 +113,7 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/**
-            target/release/bundle/**
+            src-tauri/target/release/*.exe
+            src-tauri/target/release/*.msi
+            src-tauri/target/release/*.deb
+            src-tauri/target/release/*.AppImage
