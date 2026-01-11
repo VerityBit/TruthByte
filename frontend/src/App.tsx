@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
+import { join } from "@tauri-apps/api/path";
 import {
   DiagnosisReport,
   ProgressUpdate,
@@ -135,13 +136,16 @@ export default function App() {
   }, [toast, setToast]);
 
   const handlePickPath = async () => {
-    const selection = await save({
+    const selection = await open({
       title: t("dialog.selectTargetTitle"),
-      defaultPath: "truthbyte.bin"
+      directory: true,
+      multiple: false
     });
 
-    if (typeof selection === "string") {
-      setPath(selection);
+    const pickedPath = Array.isArray(selection) ? selection[0] : selection;
+    if (typeof pickedPath === "string") {
+      const target = await join(pickedPath, "truthbyte.bin");
+      setPath(target);
     }
   };
 
