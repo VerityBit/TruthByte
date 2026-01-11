@@ -12,7 +12,6 @@ pub struct RunOutcome {
     pub report: DiagnosisReport,
 }
 
-
 #[derive(Debug)]
 pub enum RunError {
     Write(io::Error),
@@ -36,10 +35,6 @@ impl std::error::Error for RunError {
         }
     }
 }
-
-
-
-
 
 pub fn run_write_verify(
     file_path: &str,

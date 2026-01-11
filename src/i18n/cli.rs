@@ -11,8 +11,7 @@ pub enum Locale {
 
 fn parse_locale(value: &str) -> Option<Locale> {
     let locale = value.to_lowercase();
-    if locale.starts_with("zh-cn") || locale.starts_with("zh_cn") || locale.starts_with("zh-hans")
-    {
+    if locale.starts_with("zh-cn") || locale.starts_with("zh_cn") || locale.starts_with("zh-hans") {
         return Some(Locale::ZhCn);
     }
     if locale.starts_with("zh-tw")
@@ -304,4 +303,3 @@ pub fn cli_verify_phase_failed(locale: Locale) -> &'static str {
         Locale::En => "Verify phase failed",
     }
 }
-

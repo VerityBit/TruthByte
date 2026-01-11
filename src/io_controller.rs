@@ -1,8 +1,8 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use serde::Serialize;
@@ -76,10 +76,7 @@ impl DriveInspector {
             .truncate(true)
             .open(path)
             .map_err(|e| {
-                emit_error(
-                    sink,
-                    format!("Unable to open target for writing: {}", e),
-                );
+                emit_error(sink, format!("Unable to open target for writing: {}", e));
                 e
             })?;
 
@@ -102,7 +99,6 @@ impl DriveInspector {
 
         let mut stop_due_to_full = false;
         while current_offset < limit_bytes && !should_cancel(&cancel_flag) {
-
             let remaining = limit_bytes.saturating_sub(current_offset);
             if remaining == 0 {
                 break;
@@ -228,7 +224,6 @@ impl DriveInspector {
         println!("[INFO] Verify phase start. Total Bytes={}", total_bytes);
 
         while current_offset < total_bytes && !should_cancel(&cancel_flag) {
-
             let remaining = total_bytes - current_offset;
             let read_len = std::cmp::min(remaining, self.block_size as u64) as usize;
             let target_buf = &mut buffer[0..read_len];
@@ -276,8 +271,7 @@ impl DriveInspector {
 
                     let mut expected = vec![0u8; read_len];
                     core_logic::fill_block(current_offset, &mut expected);
-                    if let Some(status) =
-                        core_logic::analyze_failure_sample(&expected, target_buf)
+                    if let Some(status) = core_logic::analyze_failure_sample(&expected, target_buf)
                     {
                         let replace = match sample_status {
                             None => true,

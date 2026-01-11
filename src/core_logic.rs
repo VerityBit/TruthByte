@@ -144,7 +144,9 @@ pub fn generate_report(
 
     let base = match status {
         DriveHealthStatus::Healthy => "No inconsistencies detected.",
-        DriveHealthStatus::FakeCapacity => "Warning: detected zero-filled data; possible fake capacity.",
+        DriveHealthStatus::FakeCapacity => {
+            "Warning: detected zero-filled data; possible fake capacity."
+        }
         DriveHealthStatus::PhysicalCorruption => {
             "Warning: detected random corruption or inconsistent data."
         }
