@@ -31,6 +31,35 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Inject Version from Tag
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const tag = process.env.GITHUB_REF_NAME;
+            const version = tag.replace(/^v/, '');
+            console.log('Injecting version: ' + version);
+
+            const tauriPath = 'src-tauri/tauri.conf.json';
+            if (fs.existsSync(tauriPath)) {
+              const tauriConf = JSON.parse(fs.readFileSync(tauriPath, 'utf8'));
+              tauriConf.version = version;
+              fs.writeFileSync(tauriPath, JSON.stringify(tauriConf, null, 2));
+              console.log('Updated ' + tauriPath);
+            } else {
+              console.error('Error: ' + tauriPath + ' not found');
+              process.exit(1);
+            }
+
+            const pkgPath = 'frontend/package.json';
+            if (fs.existsSync(pkgPath)) {
+              const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+              pkg.version = version;
+              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+              console.log('Updated ' + pkgPath);
+            }
+          "
+
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -53,21 +82,19 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --locked
-
       - name: Build App
-        working-directory: src-tauri
-        run: cargo tauri build
+        working-directory: frontend
+        run: npx tauri build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: truthbyte-${{ matrix.platform }}-bundle
-          path: '**/target/release/bundle/**'
+          path: src-tauri/target/release/bundle/**
+          if-no-files-found: error
 
       - name: Publish GitHub Release Assets
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: '**/target/release/bundle/**'
+          files: src-tauri/target/release/bundle/**
