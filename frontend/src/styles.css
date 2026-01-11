@@ -6,6 +6,7 @@
 
 :root {
   color-scheme: dark;
+  --titlebar-height: 56px;
 }
 
 body {
@@ -19,10 +20,40 @@ body {
 }
 
 .app-shell {
+  position: relative;
   background-image:
     linear-gradient(transparent 0, transparent 28px, rgba(148, 163, 184, 0.06) 28px, rgba(148, 163, 184, 0.06) 29px),
     linear-gradient(90deg, transparent 0, transparent 28px, rgba(148, 163, 184, 0.04) 28px, rgba(148, 163, 184, 0.04) 29px);
   background-size: 32px 32px;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.08), transparent 55%);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-shell.report-good::before {
+  opacity: 0.6;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(34, 197, 94, 0.22), transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(16, 185, 129, 0.12), transparent 50%);
+}
+
+.app-shell.report-bad::before {
+  opacity: 0.6;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(248, 113, 113, 0.2), transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(239, 68, 68, 0.12), transparent 50%);
+}
+
+.app-shell > * {
+  position: relative;
+  z-index: 1;
 }
 
 @layer components {
@@ -125,9 +156,217 @@ body {
     background: rgba(30, 41, 59, 0.7);
   }
 
+  .drop-zone {
+    background: linear-gradient(135deg, rgba(8, 14, 24, 0.9), rgba(13, 20, 32, 0.85));
+    border-color: rgba(148, 163, 184, 0.35);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .drop-zone:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    box-shadow: 0 16px 40px rgba(14, 24, 38, 0.45);
+    transform: translateY(-2px);
+  }
+
+  .drop-zone--active {
+    border-color: rgba(56, 189, 248, 0.8);
+    box-shadow: 0 22px 50px rgba(56, 189, 248, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .progress-ring {
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+  }
+
+  .progress-ring__track {
+    fill: none;
+    stroke: rgba(148, 163, 184, 0.18);
+  }
+
+  .progress-ring__value {
+    fill: none;
+    stroke: url(#ringGradient);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease;
+  }
+
+  .progress-ring__value--cancelled {
+    fill: none;
+    stroke: rgba(148, 163, 184, 0.6);
+    stroke-linecap: round;
+  }
+
+  .progress-ring--indeterminate {
+    animation: ring-rotate 1.6s linear infinite;
+  }
+
+  .heartbeat-glow {
+    position: absolute;
+    width: 72%;
+    height: 72%;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.25), transparent 65%);
+    filter: blur(12px);
+    animation: heartbeat 2.4s ease-in-out infinite;
+  }
+
+  .report-glow {
+    position: absolute;
+    inset: -40px;
+    border-radius: 32px;
+    opacity: 0;
+    filter: blur(32px);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .report-glow--good {
+    opacity: 0.6;
+    background: radial-gradient(circle at 30% 20%, rgba(34, 197, 94, 0.35), transparent 55%);
+  }
+
+  .report-glow--bad {
+    opacity: 0.55;
+    background: radial-gradient(circle at 30% 20%, rgba(248, 113, 113, 0.35), transparent 55%);
+  }
+
+  .gauge {
+    position: relative;
+    width: min(260px, 100%);
+    margin: 0 auto;
+  }
+
+  .gauge__svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .gauge__track {
+    fill: none;
+    stroke: rgba(148, 163, 184, 0.2);
+    stroke-width: 16;
+    stroke-linecap: round;
+  }
+
+  .gauge__value {
+    fill: none;
+    stroke: url(#gaugeGradient);
+    stroke-width: 16;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: 314;
+    transition: stroke-dashoffset 0.4s ease;
+  }
+
+  .gauge__label {
+    position: absolute;
+    inset: 34% 0 auto 0;
+    text-align: center;
+  }
+
+  .block-grid {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .block-cell {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.04);
+  }
+
+  .block-cell--good {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: rgba(34, 197, 94, 0.35);
+  }
+
+  .block-cell--bad {
+    background: rgba(248, 113, 113, 0.35);
+    border-color: rgba(248, 113, 113, 0.45);
+  }
+
+  .titlebar {
+    height: var(--titlebar-height);
+    background: linear-gradient(135deg, rgba(10, 15, 28, 0.95), rgba(7, 12, 22, 0.85));
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
+    backdrop-filter: blur(14px);
+  }
+
+  .titlebar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-flex;
+  }
+
+  .titlebar-dot--mint {
+    background: rgba(52, 211, 153, 0.9);
+  }
+
+  .titlebar-dot--sky {
+    background: rgba(56, 189, 248, 0.9);
+  }
+
+  .titlebar-dot--ember {
+    background: rgba(248, 113, 113, 0.9);
+  }
+
+  .titlebar-button {
+    width: 32px;
+    height: 26px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(15, 23, 42, 0.6);
+    color: rgba(226, 232, 240, 0.8);
+    font-size: 12px;
+    line-height: 1;
+    text-transform: uppercase;
+    transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+
+  .titlebar-button:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #e2e8f0;
+    transform: translateY(-1px);
+  }
+
+  .titlebar-button--danger:hover {
+    border-color: rgba(248, 113, 113, 0.7);
+    color: rgba(254, 202, 202, 0.95);
+  }
+
   .toast {
     background: rgba(9, 13, 21, 0.92);
     border: 1px solid rgba(239, 68, 68, 0.5);
     box-shadow: 0 18px 36px rgba(2, 6, 23, 0.5);
+  }
+}
+
+@keyframes ring-rotate {
+  0% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(270deg);
+  }
+}
+
+@keyframes heartbeat {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
   }
 }
