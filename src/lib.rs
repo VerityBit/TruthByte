@@ -1,6 +1,7 @@
 mod app;
 mod config;
 mod core_logic;
+mod i18n;
 mod io_controller;
 
 pub use crate::app::{RunError, RunOutcome, run_cli, run_write_verify};
