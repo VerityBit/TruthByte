@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Locale, getInitialLocale, persistLocale } from "./i18n";
+import { Locale, getInitialLocale, persistLocale } from "./i18n/index";
 
 export type ProgressPhase = "write" | "verify";
 

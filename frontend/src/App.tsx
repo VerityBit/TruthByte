@@ -7,7 +7,7 @@ import {
   ProgressUpdate,
   useDiagnosisStore
 } from "./store";
-import { createTranslator, localeOptions } from "./i18n";
+import { createTranslator, localeOptions } from "./i18n/index";
 
 const statusStyles: Record<DiagnosisReport["status"], string> = {
   Healthy: "border-mint-500/40 bg-mint-500/15 text-mint-400",
