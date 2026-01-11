@@ -7,6 +7,7 @@ import {
   ProgressUpdate,
   useDiagnosisStore
 } from "./store";
+import { createTranslator, localeOptions } from "./i18n";
 
 const statusStyles: Record<DiagnosisReport["status"], string> = {
   Healthy: "border-mint-500/40 bg-mint-500/15 text-mint-400",
@@ -15,18 +16,7 @@ const statusStyles: Record<DiagnosisReport["status"], string> = {
   DataLoss: "border-ember-500/50 bg-ember-500/20 text-ember-400"
 };
 
-const statusLabels: Record<DiagnosisReport["status"], string> = {
-  Healthy: "Healthy",
-  FakeCapacity: "Fake capacity",
-  PhysicalCorruption: "Physical corruption",
-  DataLoss: "Data loss"
-};
-
-const numberFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 1
-});
-
-const byteFormatter = (bytes: number) => {
+const byteFormatter = (formatter: Intl.NumberFormat, bytes: number) => {
   if (bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let index = 0;
@@ -35,7 +25,7 @@ const byteFormatter = (bytes: number) => {
     value /= 1024;
     index += 1;
   }
-  return `${numberFormatter.format(value)} ${units[index]}`;
+  return `${formatter.format(value)} ${units[index]}`;
 };
 
 const timeFormatter = (seconds: number | null) => {
@@ -60,6 +50,7 @@ export default function App() {
     totalBytes,
     report,
     toast,
+    language,
     setPath,
     setLimitMb,
     setRunning,
@@ -67,8 +58,14 @@ export default function App() {
     updateProgress,
     setReport,
     setToast,
+    setLanguage,
     reset
   } = useDiagnosisStore();
+  const t = useMemo(() => createTranslator(language), [language]);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(language, { maximumFractionDigits: 1 }),
+    [language]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -110,7 +107,7 @@ export default function App() {
         () => {
           if (!mounted) return;
           // DIAGNOSIS_CANCELLED from Rust resets running state with a toast.
-          setToast("Diagnosis cancelled by user.");
+          setToast(t("toast.cancelledByUser"));
           setRunning(false);
           setStatus("cancelled");
         }
@@ -129,7 +126,7 @@ export default function App() {
       mounted = false;
       void cleanupPromise.then((cleanup) => cleanup && cleanup());
     };
-  }, [setReport, setRunning, setStatus, setToast, updateProgress]);
+  }, [setReport, setRunning, setStatus, setToast, t, updateProgress]);
 
   useEffect(() => {
     if (!toast) return;
@@ -139,7 +136,7 @@ export default function App() {
 
   const handlePickPath = async () => {
     const selection = await save({
-      title: "Select target file",
+      title: t("dialog.selectTargetTitle"),
       defaultPath: "truthbyte.bin"
     });
 
@@ -150,13 +147,13 @@ export default function App() {
 
   const handleStart = async () => {
     if (!path) {
-      setToast("Please select a target file first.");
+      setToast(t("toast.selectTarget"));
       return;
     }
 
     const parsedLimit = limitMb.trim() === "" ? 0 : Number(limitMb);
     if (Number.isNaN(parsedLimit) || parsedLimit < 0) {
-      setToast("Limit must be a valid number (MB).");
+      setToast(t("toast.invalidLimit"));
       return;
     }
 
@@ -165,23 +162,23 @@ export default function App() {
     setStatus("running");
 
     try {
-      await invoke("start_diagnosis", { path, limit_mb: parsedLimit });
+      await invoke("start_diagnosis", {
+        path,
+        limit_mb: parsedLimit,
+        locale: language
+      });
     } catch (error) {
       setRunning(false);
       setStatus("error");
-      setToast(
-        error instanceof Error ? error.message : "Failed to start diagnosis."
-      );
+      setToast(error instanceof Error ? error.message : t("toast.startFailed"));
     }
   };
 
   const handleStop = async () => {
     try {
-      await invoke("stop_diagnosis");
+      await invoke("stop_diagnosis", { locale: language });
     } catch (error) {
-      setToast(
-        error instanceof Error ? error.message : "No active task to stop."
-      );
+      setToast(error instanceof Error ? error.message : t("toast.stopFailed"));
     }
   };
 
@@ -197,25 +194,61 @@ export default function App() {
     status === "cancelled"
       ? "bg-ink-500"
       : "bg-gradient-to-r from-mint-500 via-mint-400 to-emerald-200";
+  const statusLabel = running
+    ? t("status.running")
+    : status === "cancelled"
+    ? t("status.cancelled")
+    : status === "error"
+    ? t("status.error")
+    : status === "completed"
+    ? t("status.completed")
+    : t("status.idle");
+  const statusLabels: Record<DiagnosisReport["status"], string> = {
+    Healthy: t("report.status.healthy"),
+    FakeCapacity: t("report.status.fakeCapacity"),
+    PhysicalCorruption: t("report.status.physicalCorruption"),
+    DataLoss: t("report.status.dataLoss")
+  };
 
   return (
     <div className="app-shell min-h-screen px-6 py-8 text-ink-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <p className="text-sm uppercase tracking-[0.3em] text-ink-300">
-            TruthByte Diagnostics
-          </p>
-          <h1 className="text-4xl font-semibold">Drive Integrity Console</h1>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm uppercase tracking-[0.3em] text-ink-300">
+              {t("app.title")}
+            </p>
+            <div className="flex items-center gap-2">
+              <label className="text-xs uppercase tracking-[0.2em] text-ink-400">
+                {t("label.language")}
+              </label>
+              <select
+                className="field-input px-3 py-2 text-xs text-ink-50"
+                value={language}
+                onChange={(event) =>
+                  setLanguage(event.target.value as typeof language)
+                }
+              >
+                {localeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <h1 className="text-4xl font-semibold">{t("app.heading")}</h1>
           <p className="max-w-2xl text-base text-ink-300">
-            Validate removable drives with a deterministic write/verify routine
-            and capture a trusted health report.
+            {t("app.subheading")}
           </p>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
           <section className="panel p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Configuration</h2>
+              <h2 className="text-xl font-semibold">
+                {t("section.configuration")}
+              </h2>
               <span
                 className={`rounded-full border px-3 py-1 text-xs ${
                   running
@@ -229,25 +262,19 @@ export default function App() {
                     : "border-ink-600 text-ink-300"
                 }`}
               >
-                {running
-                  ? "Running"
-                  : status === "cancelled"
-                  ? "Cancelled"
-                  : status === "error"
-                  ? "Error"
-                  : status === "completed"
-                  ? "Completed"
-                  : "Idle"}
+                {statusLabel}
               </span>
             </div>
 
             <div className="mt-6 flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <label className="text-sm text-ink-300">Target file</label>
+                <label className="text-sm text-ink-300">
+                  {t("label.targetFile")}
+                </label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                    placeholder="Select a target file on the drive"
+                    placeholder={t("placeholder.targetFile")}
                     value={path}
                     onChange={(event) => setPath(event.target.value)}
                   />
@@ -256,18 +283,18 @@ export default function App() {
                     onClick={handlePickPath}
                     type="button"
                   >
-                    Browse
+                    {t("button.browse")}
                   </button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <label className="text-sm text-ink-300">
-                  Capacity limit (MB)
+                  {t("label.capacityLimit")}
                 </label>
                 <input
                   className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                  placeholder="Leave empty for full-capacity scan"
+                  placeholder={t("placeholder.capacityLimit")}
                   value={limitMb}
                   onChange={(event) => setLimitMb(event.target.value)}
                 />
@@ -279,32 +306,36 @@ export default function App() {
                   onClick={handleStart}
                   disabled={running}
                 >
-                  Start diagnosis
+                  {t("button.startDiagnosis")}
                 </button>
                 <button
                   className="btn-danger-outline flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
                   onClick={handleStop}
                   disabled={!running}
                 >
-                  Stop
+                  {t("button.stop")}
                 </button>
               </div>
             </div>
           </section>
 
           <section className="panel p-6">
-            <h2 className="text-xl font-semibold">Live dashboard</h2>
+            <h2 className="text-xl font-semibold">
+              {t("section.liveDashboard")}
+            </h2>
             {status === "cancelled" ? (
               <div className="mt-4 rounded-2xl border border-ember-500/50 bg-ember-500/10 px-4 py-3 text-sm text-ember-200">
-                Diagnosis cancelled. You can adjust the configuration and run again.
+                {t("banner.cancelled")}
               </div>
             ) : null}
             <div className="mt-6 flex flex-col gap-6">
               <div className="panel-card p-4">
                 <div className="flex items-center justify-between text-sm text-ink-300">
-                  <span>Progress</span>
+                  <span>{t("progress.title")}</span>
                   <span className="font-mono text-xs">
-                    {phase ? phase.toUpperCase() : "STANDBY"}
+                    {phase
+                      ? t(`phase.${phase}`).toUpperCase()
+                      : t("phase.standby").toUpperCase()}
                   </span>
                 </div>
                 <div className="progress-track mt-3 h-3 w-full rounded-full">
@@ -317,10 +348,13 @@ export default function App() {
                   <span className="text-ink-200">
                     {totalBytes > 0
                       ? `${numberFormatter.format(displayProgress)}%`
-                      : "Unlimited scan"}
+                      : t("progress.unlimited")}
                   </span>
                   <span className="font-mono text-xs text-ink-400">
-                    {byteFormatter(bytesWritten)} written · {byteFormatter(bytesVerified)} verified
+                    {t("progress.detail", {
+                      written: byteFormatter(numberFormatter, bytesWritten),
+                      verified: byteFormatter(numberFormatter, bytesVerified)
+                    })}
                   </span>
                 </div>
               </div>
@@ -328,18 +362,18 @@ export default function App() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    Speed
+                    {t("metric.speed")}
                   </p>
                   <p className="mt-3 text-2xl font-semibold">
                     {numberFormatter.format(speedMbps)}
                     <span className="text-base font-normal text-ink-300">
-                      MB/s
+                      {t("metric.unit.mbps")}
                     </span>
                   </p>
                 </div>
                 <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    ETA
+                    {t("metric.eta")}
                   </p>
                   <p className="mt-3 text-2xl font-semibold">
                     {timeFormatter(etaSeconds)}
@@ -347,12 +381,12 @@ export default function App() {
                 </div>
                 <div className="metric-card p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    Target
+                    {t("metric.target")}
                   </p>
                   <p className="mt-3 text-lg font-semibold text-ink-100">
                     {totalBytes > 0
-                      ? byteFormatter(totalBytes)
-                      : "Full capacity"}
+                      ? byteFormatter(numberFormatter, totalBytes)
+                      : t("metric.fullCapacity")}
                   </p>
                 </div>
               </div>
@@ -362,7 +396,9 @@ export default function App() {
 
         <section className="panel p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Diagnosis report</h2>
+            <h2 className="text-xl font-semibold">
+              {t("section.diagnosisReport")}
+            </h2>
             {report ? (
               <span
                 className={`rounded-full border px-3 py-1 text-xs ${
@@ -372,14 +408,16 @@ export default function App() {
                 {statusLabels[report.status]}
               </span>
             ) : (
-              <span className="text-xs text-ink-400">Awaiting results</span>
+              <span className="text-xs text-ink-400">
+                {t("status.awaitingResults")}
+              </span>
             )}
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
             <div className="panel-card p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                Health score
+                {t("report.healthScore")}
               </p>
               <p className="mt-4 text-4xl font-semibold">
                 {report
@@ -390,33 +428,42 @@ export default function App() {
               <p className="mt-4 text-sm text-ink-300">
                 {report
                   ? report.conclusion
-                  : "Run a diagnosis to generate a full integrity report."}
+                  : t("report.placeholder")}
               </p>
             </div>
 
             <div className="panel-card p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                Error sample analysis
+                {t("report.errorSampleAnalysis")}
               </p>
               <div className="mt-4 space-y-2 text-sm text-ink-200">
                 <p>
-                  Tested bytes: {report ? byteFormatter(report.tested_bytes) : "--"}
+                  {t("report.testedBytes")}:{" "}
+                  {report
+                    ? byteFormatter(numberFormatter, report.tested_bytes)
+                    : "--"}
                 </p>
                 <p>
-                  Valid bytes: {report ? byteFormatter(report.valid_bytes) : "--"}
+                  {t("report.validBytes")}:{" "}
+                  {report
+                    ? byteFormatter(numberFormatter, report.valid_bytes)
+                    : "--"}
                 </p>
                 <p>
-                  Error count: {report ? report.error_count : "--"}
+                  {t("report.errorCount")}: {report ? report.error_count : "--"}
                 </p>
                 <p>
-                  Total capacity: {report ? byteFormatter(report.total_capacity) : "--"}
+                  {t("report.totalCapacity")}:{" "}
+                  {report
+                    ? byteFormatter(numberFormatter, report.total_capacity)
+                    : "--"}
                 </p>
               </div>
               <p className="mt-5 text-xs uppercase tracking-[0.2em] text-ink-400">
-                Final conclusion
+                {t("report.finalConclusion")}
               </p>
               <p className="mt-2 text-sm text-ink-300">
-                {report ? statusLabels[report.status] : "Pending"}
+                {report ? statusLabels[report.status] : t("status.pending")}
               </p>
             </div>
           </div>

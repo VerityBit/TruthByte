@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Locale, getInitialLocale, persistLocale } from "./i18n";
 
 export type ProgressPhase = "write" | "verify";
 
@@ -34,6 +35,7 @@ interface DiagnosisState {
   totalBytes: number;
   report: DiagnosisReport | null;
   toast: string | null;
+  language: Locale;
   setPath: (path: string) => void;
   setLimitMb: (limitMb: string) => void;
   setRunning: (running: boolean) => void;
@@ -41,6 +43,7 @@ interface DiagnosisState {
   updateProgress: (update: ProgressUpdate) => void;
   setReport: (report: DiagnosisReport | null) => void;
   setToast: (message: string | null) => void;
+  setLanguage: (language: Locale) => void;
   reset: () => void;
 }
 
@@ -57,6 +60,7 @@ export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   totalBytes: 0,
   report: null,
   toast: null,
+  language: getInitialLocale(),
   setPath: (path) => set({ path }),
   setLimitMb: (limitMb) => set({ limitMb }),
   setRunning: (running) => set({ running }),
@@ -72,6 +76,10 @@ export const useDiagnosisStore = create<DiagnosisState>((set) => ({
     }),
   setReport: (report) => set({ report }),
   setToast: (toast) => set({ toast }),
+  setLanguage: (language) => {
+    persistLocale(language);
+    set({ language });
+  },
   reset: () =>
     set({
       status: "idle",

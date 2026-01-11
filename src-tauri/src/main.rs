@@ -4,9 +4,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, State};
-use truthbyte::{
-    AppConfig, DiagnosisReport, DriveHealthStatus, DriveInspector, EventSink, ProgressUpdate,
-};
+use truthbyte::{AppConfig, DiagnosisReport, DriveInspector, EventSink, ProgressUpdate};
+
+mod i18n;
+use crate::i18n::{localize_conclusion, localize_error, localize_report_conclusion, Locale};
 
 const EVENT_PROGRESS: &str = "PROGRESS_UPDATE";
 const EVENT_ERROR: &str = "ERROR_OCCURRED";
@@ -26,6 +27,7 @@ struct ErrorPayload {
 
 struct TauriEventSink {
     app: AppHandle,
+    locale: Locale,
 }
 
 impl EventSink for TauriEventSink {
@@ -36,7 +38,8 @@ impl EventSink for TauriEventSink {
 
     fn error(&self, message: String) {
         // Frontend listens to ERROR_OCCURRED with ErrorPayload { message }.
-        let _ = self.app.emit(EVENT_ERROR, ErrorPayload { message });
+        let localized = localize_error(self.locale, &message);
+        let _ = self.app.emit(EVENT_ERROR, ErrorPayload { message: localized });
     }
 }
 
@@ -46,9 +49,11 @@ async fn start_diagnosis(
     state: State<'_, AppState>,
     path: String,
     limit_mb: u64,
+    locale: String,
 ) -> Result<(), String> {
+    let locale = Locale::from_tag(&locale);
     if state.running.swap(true, Ordering::SeqCst) {
-        return Err("Diagnosis is already running.".to_string());
+        return Err(localize_error(locale, "Diagnosis is already running."));
     }
 
     state.cancel_flag.store(false, Ordering::SeqCst);
@@ -59,12 +64,15 @@ async fn start_diagnosis(
 
     tauri::async_runtime::spawn_blocking(move || {
         let inspector = DriveInspector::with_config(&path, AppConfig::default());
-        let sink = TauriEventSink { app: app_handle };
+        let sink = TauriEventSink {
+            app: app_handle,
+            locale,
+        };
 
         let result =
             inspector.run_write_phase_with_events(limit_mb, Some(cancel_flag.clone()), Some(&sink));
 
-        let report = match result {
+        let mut report = match result {
             Ok(bytes_written) => {
                 if bytes_written == 0 {
                     DiagnosisReport {
@@ -73,8 +81,11 @@ async fn start_diagnosis(
                         valid_bytes: 0,
                         error_count: 0,
                         health_score: 0.0,
-                        status: DriveHealthStatus::DataLoss,
-                        conclusion: "No data written; verification skipped.".to_string(),
+                        status: truthbyte::DriveHealthStatus::DataLoss,
+                        conclusion: localize_conclusion(
+                            locale,
+                            "No data written; verification skipped.",
+                        ),
                     }
                 } else {
                     match inspector.run_verify_phase_with_events(
@@ -112,6 +123,10 @@ async fn start_diagnosis(
             }
         };
 
+        if report.total_capacity > 0 {
+            report.conclusion = localize_report_conclusion(locale, &report);
+        }
+
         // Frontend listens to DIAGNOSIS_COMPLETE with DiagnosisReport payload.
         let _ = sink.app.emit(EVENT_COMPLETE, report);
         running.store(false, Ordering::SeqCst);
@@ -122,9 +137,10 @@ async fn start_diagnosis(
 }
 
 #[tauri::command]
-async fn stop_diagnosis(state: State<'_, AppState>) -> Result<(), String> {
+async fn stop_diagnosis(state: State<'_, AppState>, locale: String) -> Result<(), String> {
+    let locale = Locale::from_tag(&locale);
     if !state.running.load(Ordering::SeqCst) {
-        return Err("No active diagnosis to stop.".to_string());
+        return Err(localize_error(locale, "No active diagnosis to stop."));
     }
 
     state.cancel_flag.store(true, Ordering::SeqCst);
