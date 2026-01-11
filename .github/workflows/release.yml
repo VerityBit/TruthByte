@@ -85,7 +85,7 @@ jobs:
       - name: Build App
         working-directory: .
         shell: bash
-        run: npm run tauri build --prefix frontend
+        run: ./frontend/node_modules/.bin/tauri build
 
       - name: Debug - List Build Output
         shell: bash
