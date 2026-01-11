@@ -2,6 +2,7 @@ use std::env;
 
 use crate::core_logic::{DiagnosisReport, DriveHealthStatus};
 
+#[derive(Copy, Clone)]
 pub enum Locale {
     En,
     ZhCn,
