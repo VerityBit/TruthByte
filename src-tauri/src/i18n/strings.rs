@@ -49,16 +49,19 @@ impl Locale {
     }
 }
 
-pub fn localize_error(locale: Locale, message: &str) -> String {
-    let translate_simple = |en: &str,
-                            es: &str,
-                            fr: &str,
-                            de: &str,
-                            ru: &str,
-                            ko: &str,
-                            zh_cn: &str,
-                            zh_tw: &str,
-                            ja: &str| match locale {
+fn translate_simple<'a>(
+    locale: Locale,
+    en: &'a str,
+    es: &'a str,
+    fr: &'a str,
+    de: &'a str,
+    ru: &'a str,
+    ko: &'a str,
+    zh_cn: &'a str,
+    zh_tw: &'a str,
+    ja: &'a str,
+) -> &'a str {
+    match locale {
         Locale::En => en,
         Locale::Es => es,
         Locale::Fr => fr,
@@ -68,10 +71,13 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         Locale::ZhCn => zh_cn,
         Locale::ZhTw => zh_tw,
         Locale::Ja => ja,
-    };
+    }
+}
 
+pub fn localize_error(locale: Locale, message: &str) -> String {
     let localize_detail = |detail: &str| match detail {
         "Parent directory does not exist." => translate_simple(
+            locale,
             "Parent directory does not exist.",
             "El directorio padre no existe.",
             "Le répertoire parent n'existe pas.",
@@ -89,6 +95,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
     match message {
         "Diagnosis is already running." => {
             return translate_simple(
+                locale,
                 "Diagnosis is already running.",
                 "El diagnóstico ya se está ejecutando.",
                 "Le diagnostic est déjà en cours.",
@@ -103,6 +110,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         }
         "No active diagnosis to stop." => {
             return translate_simple(
+                locale,
                 "No active diagnosis to stop.",
                 "No hay un diagnóstico activo para detener.",
                 "Aucun diagnostic actif à arrêter.",
@@ -117,6 +125,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         }
         "Parent directory does not exist." => {
             return translate_simple(
+                locale,
                 "Parent directory does not exist.",
                 "El directorio padre no existe.",
                 "Le répertoire parent n'existe pas.",
@@ -136,6 +145,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         return format!(
             "{}: {}",
             translate_simple(
+                locale,
                 "Verify phase failed",
                 "La fase de verificación falló",
                 "La phase de vérification a échoué",
@@ -154,6 +164,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         return format!(
             "{}: {}",
             translate_simple(
+                locale,
                 "Write phase failed",
                 "La fase de escritura falló",
                 "La phase d'écriture a échoué",
@@ -172,6 +183,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         return format!(
             "{}: {}",
             translate_simple(
+                locale,
                 "Unable to open target for writing",
                 "No se pudo abrir el destino para escritura",
                 "Impossible d'ouvrir la cible en écriture",
@@ -190,6 +202,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         return format!(
             "{}: {}",
             translate_simple(
+                locale,
                 "Unable to open target for reading",
                 "No se pudo abrir el destino para lectura",
                 "Impossible d'ouvrir la cible en lecture",
@@ -208,6 +221,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
         return format!(
             "{}: {}",
             translate_simple(
+                locale,
                 "Failed to sync data",
                 "No se pudieron sincronizar los datos",
                 "Échec de la synchronisation des données",
@@ -227,6 +241,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
             return format!(
                 "{} {}: {}",
                 translate_simple(
+                    locale,
                     "Write failure at offset",
                     "Fallo de escritura en el desplazamiento",
                     "Échec d'écriture à l'octet",
@@ -248,6 +263,7 @@ pub fn localize_error(locale: Locale, message: &str) -> String {
             return format!(
                 "{} {}: {}",
                 translate_simple(
+                    locale,
                     "Unable to seek past read failure at offset",
                     "No se pudo avanzar después del fallo de lectura en el desplazamiento",
                     "Impossible de dépasser l'échec de lecture à l'octet",
