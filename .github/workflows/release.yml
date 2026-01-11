@@ -101,6 +101,7 @@ jobs:
           name: truthbyte-${{ matrix.platform }}-bundle
           path: |
             src-tauri/target/release/bundle/**
+            src-tauri/target/release/truthbyte-desktop
             src-tauri/target/release/*.exe
             src-tauri/target/release/*.msi
             src-tauri/target/release/*.deb
@@ -113,6 +114,7 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/**
+            src-tauri/target/release/truthbyte-desktop
             src-tauri/target/release/*.exe
             src-tauri/target/release/*.msi
             src-tauri/target/release/*.deb
