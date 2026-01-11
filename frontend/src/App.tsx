@@ -1,41 +1,18 @@
-﻿import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { join } from "@tauri-apps/api/path";
+import { dirname, join } from "@tauri-apps/api/path";
 import {
   DiagnosisReport,
   ProgressUpdate,
   useDiagnosisStore
 } from "./store";
 import { createTranslator, localeOptions } from "./i18n/index";
-
-const statusStyles: Record<DiagnosisReport["status"], string> = {
-  Healthy: "border-mint-500/40 bg-mint-500/15 text-mint-400",
-  FakeCapacity: "border-ember-500/50 bg-ember-500/20 text-ember-400",
-  PhysicalCorruption: "border-ember-500/50 bg-ember-500/20 text-ember-400",
-  DataLoss: "border-ember-500/50 bg-ember-500/20 text-ember-400"
-};
-
-const byteFormatter = (formatter: Intl.NumberFormat, bytes: number) => {
-  if (bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let index = 0;
-  let value = bytes;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-  return `${formatter.format(value)} ${units[index]}`;
-};
-
-const timeFormatter = (seconds: number | null) => {
-  if (seconds === null) return "--";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.round(seconds % 60);
-  return `${minutes}m ${remaining}s`;
-};
+import SetupView from "./components/SetupView";
+import ProgressView from "./components/ProgressView";
+import ReportView from "./components/ReportView";
+import TitleBar from "./components/TitleBar";
 
 export default function App() {
   const {
@@ -67,6 +44,11 @@ export default function App() {
     () => new Intl.NumberFormat(language, { maximumFractionDigits: 1 }),
     [language]
   );
+  const resolveTargetPath = useCallback(async (pickedPath: string) => {
+    const looksLikeFile = /[\\/][^\\/]+\.[^\\/]+$/.test(pickedPath);
+    const baseDir = looksLikeFile ? await dirname(pickedPath) : pickedPath;
+    return join(baseDir, "truthbyte.bin");
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -130,6 +112,32 @@ export default function App() {
   }, [setReport, setRunning, setStatus, setToast, t, updateProgress]);
 
   useEffect(() => {
+    let mounted = true;
+    const init = async () => {
+      const unlistenFileDrop = await listen<string[]>(
+        "tauri://file-drop",
+        async (event) => {
+          if (!mounted) return;
+          const [pickedPath] = event.payload ?? [];
+          if (!pickedPath) return;
+          const target = await resolveTargetPath(pickedPath);
+          setPath(target);
+        }
+      );
+
+      return () => {
+        unlistenFileDrop();
+      };
+    };
+
+    const cleanupPromise = init();
+    return () => {
+      mounted = false;
+      void cleanupPromise.then((cleanup) => cleanup && cleanup());
+    };
+  }, [resolveTargetPath, setPath]);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
@@ -144,7 +152,7 @@ export default function App() {
 
     const pickedPath = Array.isArray(selection) ? selection[0] : selection;
     if (typeof pickedPath === "string") {
-      const target = await join(pickedPath, "truthbyte.bin");
+      const target = await resolveTargetPath(pickedPath);
       setPath(target);
     }
   };
@@ -194,10 +202,6 @@ export default function App() {
   }, [bytesVerified, bytesWritten, phase, running, speedMbps, totalBytes]);
 
   const displayProgress = totalBytes > 0 ? Math.min(progress, 100) : 0;
-  const progressBarClass =
-    status === "cancelled"
-      ? "bg-ink-500"
-      : "bg-gradient-to-r from-mint-500 via-mint-400 to-emerald-200";
   const statusLabel = running
     ? t("status.running")
     : status === "cancelled"
@@ -213,9 +217,18 @@ export default function App() {
     PhysicalCorruption: t("report.status.physicalCorruption"),
     DataLoss: t("report.status.dataLoss")
   };
+  const view = running ? "progress" : report ? "report" : "setup";
+  const reportMood = report
+    ? report.status === "Healthy"
+      ? "good"
+      : "bad"
+    : "neutral";
 
   return (
-    <div className="app-shell min-h-screen px-6 py-8 text-ink-50">
+    <div
+      className={`app-shell min-h-screen px-6 pb-8 pt-[calc(var(--titlebar-height)+32px)] text-ink-50 view-${view} report-${reportMood}`}
+    >
+      <TitleBar />
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -247,231 +260,46 @@ export default function App() {
           </p>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
-          <section className="panel p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {t("section.configuration")}
-              </h2>
-              <span
-                className={`rounded-full border px-3 py-1 text-xs ${
-                  running
-                    ? "border-mint-500/40 bg-mint-500/10 text-mint-300"
-                    : status === "cancelled"
-                    ? "border-ember-500/40 bg-ember-500/10 text-ember-300"
-                    : status === "error"
-                    ? "border-ember-500/40 bg-ember-500/10 text-ember-300"
-                    : status === "completed"
-                    ? "border-mint-500/40 bg-mint-500/10 text-mint-300"
-                    : "border-ink-600 text-ink-300"
-                }`}
-              >
-                {statusLabel}
-              </span>
-            </div>
+        {view === "setup" ? (
+          <SetupView
+            t={t}
+            running={running}
+            status={status}
+            statusLabel={statusLabel}
+            path={path}
+            limitMb={limitMb}
+            handlePickPath={handlePickPath}
+            handleStart={handleStart}
+            handleStop={handleStop}
+            setPath={setPath}
+            setLimitMb={setLimitMb}
+          />
+        ) : null}
 
-            <div className="mt-6 flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm text-ink-300">
-                  {t("label.targetFile")}
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                    placeholder={t("placeholder.targetFile")}
-                    value={path}
-                    onChange={(event) => setPath(event.target.value)}
-                  />
-                  <button
-                    className="btn-secondary rounded-2xl px-4 py-3 text-sm font-medium"
-                    onClick={handlePickPath}
-                    type="button"
-                  >
-                    {t("button.browse")}
-                  </button>
-                </div>
-              </div>
+        {view === "progress" ? (
+          <ProgressView
+            t={t}
+            status={status}
+            phase={phase}
+            displayProgress={displayProgress}
+            numberFormatter={numberFormatter}
+            bytesWritten={bytesWritten}
+            bytesVerified={bytesVerified}
+            speedMbps={speedMbps}
+            etaSeconds={etaSeconds}
+            totalBytes={totalBytes}
+            handleStop={handleStop}
+          />
+        ) : null}
 
-              <div className="flex flex-col gap-2">
-                <label className="text-sm text-ink-300">
-                  {t("label.capacityLimit")}
-                </label>
-                <input
-                  className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                  placeholder={t("placeholder.capacityLimit")}
-                  value={limitMb}
-                  onChange={(event) => setLimitMb(event.target.value)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-                <button
-                  className="btn-primary flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
-                  onClick={handleStart}
-                  disabled={running}
-                >
-                  {t("button.startDiagnosis")}
-                </button>
-                <button
-                  className="btn-danger-outline flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
-                  onClick={handleStop}
-                  disabled={!running}
-                >
-                  {t("button.stop")}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel p-6">
-            <h2 className="text-xl font-semibold">
-              {t("section.liveDashboard")}
-            </h2>
-            {status === "cancelled" ? (
-              <div className="mt-4 rounded-2xl border border-ember-500/50 bg-ember-500/10 px-4 py-3 text-sm text-ember-200">
-                {t("banner.cancelled")}
-              </div>
-            ) : null}
-            <div className="mt-6 flex flex-col gap-6">
-              <div className="panel-card p-4">
-                <div className="flex items-center justify-between text-sm text-ink-300">
-                  <span>{t("progress.title")}</span>
-                  <span className="font-mono text-xs">
-                    {phase
-                      ? t(`phase.${phase}`).toUpperCase()
-                      : t("phase.standby").toUpperCase()}
-                  </span>
-                </div>
-                <div className="progress-track mt-3 h-3 w-full rounded-full">
-                  <div
-                    className={`h-3 rounded-full transition-all ${progressBarClass}`}
-                    style={{ width: `${displayProgress}%` }}
-                  />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-ink-200">
-                    {totalBytes > 0
-                      ? `${numberFormatter.format(displayProgress)}%`
-                      : t("progress.unlimited")}
-                  </span>
-                  <span className="font-mono text-xs text-ink-400">
-                    {t("progress.detail", {
-                      written: byteFormatter(numberFormatter, bytesWritten),
-                      verified: byteFormatter(numberFormatter, bytesVerified)
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="metric-card p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    {t("metric.speed")}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold">
-                    {numberFormatter.format(speedMbps)}
-                    <span className="text-base font-normal text-ink-300">
-                      {t("metric.unit.mbps")}
-                    </span>
-                  </p>
-                </div>
-                <div className="metric-card p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    {t("metric.eta")}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold">
-                    {timeFormatter(etaSeconds)}
-                  </p>
-                </div>
-                <div className="metric-card p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                    {t("metric.target")}
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-ink-100">
-                    {totalBytes > 0
-                      ? byteFormatter(numberFormatter, totalBytes)
-                      : t("metric.fullCapacity")}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <section className="panel p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              {t("section.diagnosisReport")}
-            </h2>
-            {report ? (
-              <span
-                className={`rounded-full border px-3 py-1 text-xs ${
-                  statusStyles[report.status]
-                }`}
-              >
-                {statusLabels[report.status]}
-              </span>
-            ) : (
-              <span className="text-xs text-ink-400">
-                {t("status.awaitingResults")}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-            <div className="panel-card p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                {t("report.healthScore")}
-              </p>
-              <p className="mt-4 text-4xl font-semibold">
-                {report
-                  ? numberFormatter.format(report.health_score)
-                  : "--"}
-                <span className="text-lg font-normal text-ink-300">/100</span>
-              </p>
-              <p className="mt-4 text-sm text-ink-300">
-                {report
-                  ? report.conclusion
-                  : t("report.placeholder")}
-              </p>
-            </div>
-
-            <div className="panel-card p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                {t("report.errorSampleAnalysis")}
-              </p>
-              <div className="mt-4 space-y-2 text-sm text-ink-200">
-                <p>
-                  {t("report.testedBytes")}:{" "}
-                  {report
-                    ? byteFormatter(numberFormatter, report.tested_bytes)
-                    : "--"}
-                </p>
-                <p>
-                  {t("report.validBytes")}:{" "}
-                  {report
-                    ? byteFormatter(numberFormatter, report.valid_bytes)
-                    : "--"}
-                </p>
-                <p>
-                  {t("report.errorCount")}: {report ? report.error_count : "--"}
-                </p>
-                <p>
-                  {t("report.totalCapacity")}:{" "}
-                  {report
-                    ? byteFormatter(numberFormatter, report.total_capacity)
-                    : "--"}
-                </p>
-              </div>
-              <p className="mt-5 text-xs uppercase tracking-[0.2em] text-ink-400">
-                {t("report.finalConclusion")}
-              </p>
-              <p className="mt-2 text-sm text-ink-300">
-                {report ? statusLabels[report.status] : t("status.pending")}
-              </p>
-            </div>
-          </div>
-        </section>
+        {view === "report" ? (
+          <ReportView
+            t={t}
+            report={report}
+            numberFormatter={numberFormatter}
+            statusLabels={statusLabels}
+          />
+        ) : null}
       </div>
 
       {toast ? (
