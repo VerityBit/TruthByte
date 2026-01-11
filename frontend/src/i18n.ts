@@ -1,19 +1,46 @@
-import en from "./i18n.en";
+ï»¿import en from "./i18n.en";
+import es from "./i18n.es";
+import fr from "./i18n.fr";
+import de from "./i18n.de";
 import ja from "./i18n.ja";
+import ko from "./i18n.ko";
+import ru from "./i18n.ru";
 import zhCn from "./i18n.zh-CN";
 import zhTw from "./i18n.zh-TW";
 
-export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
+export type Locale =
+  | "en"
+  | "es"
+  | "fr"
+  | "de"
+  | "ru"
+  | "ko"
+  | "zh-CN"
+  | "zh-TW"
+  | "ja";
 
 type TranslationDict = Record<string, string>;
 
 const STORAGE_KEY = "truthbyte.locale";
 
 const isLocale = (value: string): value is Locale =>
-  value === "en" || value === "zh-CN" || value === "zh-TW" || value === "ja";
+  value === "en" ||
+  value === "es" ||
+  value === "fr" ||
+  value === "de" ||
+  value === "ru" ||
+  value === "ko" ||
+  value === "zh-CN" ||
+  value === "zh-TW" ||
+  value === "ja";
 
 const translations: Record<Locale, TranslationDict> = {
   en,
+  es,
+  fr,
+  de,
+  ru,
+  ko,
   "zh-CN": zhCn,
   "zh-TW": zhTw,
   ja
@@ -21,9 +48,14 @@ const translations: Record<Locale, TranslationDict> = {
 
 export const localeOptions: Array<{ value: Locale; label: string }> = [
   { value: "en", label: "English" },
-  { value: "zh-CN", label: "¼òÌåÖÐÎÄ" },
-  { value: "zh-TW", label: "·±ówÖÐÎÄ" },
-  { value: "ja", label: "ÈÕ±¾ÕZ" }
+  { value: "es", label: "EspaÃ±ol" },
+  { value: "fr", label: "FranÃ§ais" },
+  { value: "de", label: "Deutsch" },
+  { value: "ru", label: "Ð ÑƒÑÑÐºÐ¸Ð¹" },
+  { value: "ko", label: "í•œêµ­ì–´" },
+  { value: "zh-CN", label: "ç®€ä½“ä¸­æ–‡" },
+  { value: "zh-TW", label: "ç¹é«”ä¸­æ–‡" },
+  { value: "ja", label: "æ—¥æœ¬èªž" }
 ];
 
 export const getInitialLocale = (): Locale => {
@@ -48,6 +80,21 @@ export const getInitialLocale = (): Locale => {
   }
   if (locale.startsWith("ja")) {
     return "ja";
+  }
+  if (locale.startsWith("ko")) {
+    return "ko";
+  }
+  if (locale.startsWith("es")) {
+    return "es";
+  }
+  if (locale.startsWith("fr")) {
+    return "fr";
+  }
+  if (locale.startsWith("de")) {
+    return "de";
+  }
+  if (locale.startsWith("ru")) {
+    return "ru";
   }
   return "en";
 };
