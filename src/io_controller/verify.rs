@@ -20,6 +20,8 @@ impl super::DriveInspector {
         cancel_flag: Option<Arc<AtomicBool>>,
         sink: Option<&dyn super::EventSink>,
     ) -> io::Result<DiagnosisReport> {
+        const MAX_READ_RETRIES: usize = 3;
+        const MAX_CONSECUTIVE_BAD_BLOCKS: u64 = 1000;
         let block_size = resolve_block_size(self.block_size)?;
         if total_bytes % DIRECT_IO_ALIGNMENT as u64 != 0 {
             return Err(io::Error::new(
@@ -36,6 +38,7 @@ impl super::DriveInspector {
         let mut mismatch_blocks: u64 = 0;
         let mut read_error_blocks: u64 = 0;
         let mut valid_bytes: u64 = 0;
+        let mut consecutive_bad_blocks: u64 = 0;
         let mut sample_status: Option<DriveHealthStatus> = None;
         let mut last_log_time = Instant::now();
         let mut last_emit_time = Instant::now();
@@ -48,36 +51,72 @@ impl super::DriveInspector {
             let read_len = std::cmp::min(remaining, block_size as u64) as usize;
             let target_buf = &mut buffer.as_mut_slice()[0..read_len];
 
-            match file.read_exact(target_buf) {
-                Ok(_) => {}
-                Err(e) => {
-                    if read_error_blocks < 5 {
+            let mut read_ok = false;
+            let mut last_error: Option<io::Error> = None;
+            for _ in 0..=MAX_READ_RETRIES {
+                if let Err(seek_err) = file.seek(SeekFrom::Start(current_offset)) {
+                    emit_error(
+                        sink,
+                        format!(
+                            "Unable to reset file pointer at offset {}: {}",
+                            current_offset, seek_err
+                        ),
+                    );
+                    last_error = Some(seek_err);
+                    break;
+                }
+                match file.read_exact(target_buf) {
+                    Ok(_) => {
+                        read_ok = true;
+                        break;
+                    }
+                    Err(e) => {
+                        last_error = Some(e);
+                    }
+                }
+            }
+
+            if !read_ok {
+                if read_error_blocks < 5 {
+                    if let Some(e) = last_error.as_ref() {
                         println!(
                             "[ERROR] Read failed at offset {}: {}. Skipping block.",
                             current_offset, e
                         );
                     }
-                    read_error_blocks += 1;
-                    if let Err(seek_err) =
-                        file.seek(SeekFrom::Start(current_offset + read_len as u64))
-                    {
-                        emit_error(
-                            sink,
-                            format!(
-                                "Unable to seek past read failure at offset {}: {}",
-                                current_offset, seek_err
-                            ),
-                        );
-                        break;
-                    }
-                    current_offset += read_len as u64;
-                    continue;
                 }
+                read_error_blocks += 1;
+                consecutive_bad_blocks += 1;
+                if consecutive_bad_blocks >= MAX_CONSECUTIVE_BAD_BLOCKS {
+                    emit_error(
+                        sink,
+                        format!(
+                            "Aborting verify after {} consecutive bad blocks.",
+                            consecutive_bad_blocks
+                        ),
+                    );
+                    break;
+                }
+                if let Err(seek_err) =
+                    file.seek(SeekFrom::Start(current_offset + read_len as u64))
+                {
+                    emit_error(
+                        sink,
+                        format!(
+                            "Unable to seek past read failure at offset {}: {}",
+                            current_offset, seek_err
+                        ),
+                    );
+                    break;
+                }
+                current_offset += read_len as u64;
+                continue;
             }
 
             match core_logic::verify_block(current_offset, target_buf) {
                 Ok(_) => {
                     valid_bytes += read_len as u64;
+                    consecutive_bad_blocks = 0;
                 }
                 Err(bad_idx) => {
                     let global_pos = current_offset + bad_idx as u64;
@@ -88,6 +127,17 @@ impl super::DriveInspector {
                         );
                     }
                     mismatch_blocks += 1;
+                    consecutive_bad_blocks += 1;
+                    if consecutive_bad_blocks >= MAX_CONSECUTIVE_BAD_BLOCKS {
+                        emit_error(
+                            sink,
+                            format!(
+                                "Aborting verify after {} consecutive bad blocks.",
+                                consecutive_bad_blocks
+                            ),
+                        );
+                        break;
+                    }
 
                     let mut expected = vec![0u8; read_len];
                     core_logic::fill_block(current_offset, &mut expected);
