@@ -1,137 +1,196 @@
-import { useState } from "react";
+import { DiskInfo } from "../store";
 import { Translator } from "./diagnosisUtils";
 
 type SetupViewProps = {
   t: Translator;
   running: boolean;
-  status: string;
   statusLabel: string;
   path: string;
   limitMb: string;
-  handlePickPath: () => Promise<void>;
-  handleStart: () => Promise<void>;
+  disks: DiskInfo[];
+  isScanning: boolean;
+  handleScan: () => Promise<void>;
+  handleSelectDisk: (disk: DiskInfo) => Promise<void>;
+  handleStart: () => void;
   handleStop: () => Promise<void>;
-  setPath: (value: string) => void;
   setLimitMb: (value: string) => void;
 };
 
 const SetupView = ({
-  t,
-  running,
-  status,
-  statusLabel,
-  path,
-  limitMb,
-  handlePickPath,
-  handleStart,
-  handleStop,
-  setPath,
-  setLimitMb
-}: SetupViewProps) => {
-  const [isDragActive, setIsDragActive] = useState(false);
+                     t,
+                     running,
+                     statusLabel,
+                     path,
+                     limitMb,
+                     disks,
+                     isScanning,
+                     handleScan,
+                     handleSelectDisk,
+                     handleStart,
+                     handleStop,
+                     setLimitMb
+                   }: SetupViewProps) => {
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
 
   return (
-    <section className="panel p-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">{t("section.configuration")}</h2>
-        <span
-          className={`rounded-full border px-3 py-1 text-xs ${
-            running
-              ? "border-mint-500/40 bg-mint-500/10 text-mint-300"
-              : status === "cancelled"
-              ? "border-ember-500/40 bg-ember-500/10 text-ember-300"
-              : status === "error"
-              ? "border-ember-500/40 bg-ember-500/10 text-ember-300"
-              : status === "completed"
-              ? "border-mint-500/40 bg-mint-500/10 text-mint-300"
-              : "border-ink-600 text-ink-300"
-          }`}
-        >
-          {statusLabel}
-        </span>
-      </div>
+      <section className="panel animate-enter relative overflow-hidden p-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold tracking-tight">{t("section.configuration")}</h2>
+          <div className="flex gap-3">
+            <button
+                onClick={handleScan}
+                disabled={isScanning || running}
+                className="flex items-center gap-2 rounded-lg bg-ink-800/50 px-3 py-1 text-xs font-medium text-ink-300 transition-colors hover:bg-ink-700 hover:text-ink-100 disabled:opacity-50"
+            >
+              <svg className={`h-3 w-3 ${isScanning ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isScanning ? "Scanning..." : "Refresh"}
+            </button>
+            <span
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    running
+                        ? "border-mint-500/40 bg-mint-500/10 text-mint-300 shadow-[0_0_10px_rgba(52,211,153,0.2)]"
+                        : "border-ink-600 bg-ink-800/50 text-ink-300"
+                }`}
+            >
+            {statusLabel}
+            </span>
+          </div>
+        </div>
 
-      <div className="mt-10 flex min-h-[58vh] flex-col items-center justify-center gap-6 text-center">
-        <button
-          className={`drop-zone group w-full max-w-3xl rounded-[28px] border border-dashed px-8 py-12 ${
-            isDragActive ? "drop-zone--active" : ""
-          }`}
-          onClick={handlePickPath}
-          onDragEnter={() => setIsDragActive(true)}
-          onDragLeave={() => setIsDragActive(false)}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragActive(true);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDragActive(false);
-          }}
-          type="button"
-        >
-          <p className="text-lg uppercase tracking-[0.35em] text-ink-400">
-            {t("dialog.selectTargetTitle")}
-          </p>
-          <p className="mt-4 text-3xl font-semibold text-ink-50">
-            {t("placeholder.targetFile")}
-          </p>
-          <p className="mt-3 break-all text-sm text-ink-300">
-            {path ? path : t("label.targetFile")}
-          </p>
-        </button>
+        <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+          {/* Left Column: Disk Grid */}
+          <div className="flex-1">
+            <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-ink-400">
+              {t("label.targetFile") || "Select Drive"}
+            </label>
 
-        <button
-          className="btn-primary rounded-2xl px-10 py-4 text-base font-semibold"
-          onClick={handleStart}
-          disabled={running}
-        >
-          {t("button.startDiagnosis")}
-        </button>
-      </div>
+            {disks.length === 0 ? (
+                <div className="flex h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-ink-700 bg-ink-800/30 text-ink-400">
+                  <p className="mb-2">No drives found</p>
+                  <button onClick={handleScan} className="text-sm text-sky-400 hover:underline">Retry Scan</button>
+                </div>
+            ) : (
+                <div className="grid max-h-[400px] grid-cols-1 gap-3 overflow-y-auto pr-2 custom-scrollbar sm:grid-cols-2">
+                  {disks.map((disk) => {
+                    const isSelected = path.startsWith(disk.mount_point);
+                    const usagePercent = ((disk.total_space - disk.available_space) / disk.total_space) * 100;
 
-      <div className="mt-10">
-        <details className="panel-card px-5 py-4 text-sm text-ink-300">
-          <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-ink-400">
-            {t("section.configuration")}
-          </summary>
-          <div className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm text-ink-300">
-                {t("label.targetFile")}
-              </label>
-              <input
-                className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                placeholder={t("placeholder.targetFile")}
-                value={path}
-                onChange={(event) => setPath(event.target.value)}
-              />
+                    return (
+                        <button
+                            key={disk.mount_point}
+                            onClick={() => handleSelectDisk(disk)}
+                            disabled={running}
+                            className={`group relative flex flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
+                                isSelected
+                                    ? "border-mint-500/50 bg-mint-500/10 shadow-[0_0_20px_rgba(16,185,129,0.1)] ring-1 ring-mint-500/20"
+                                    : "border-ink-700 bg-ink-800/40 hover:border-ink-500 hover:bg-ink-800/80"
+                            }`}
+                        >
+                          <div className="flex w-full items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isSelected ? "bg-mint-500/20 text-mint-400" : "bg-ink-700 text-ink-400"}`}>
+                                {disk.is_removable ? (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                ) : (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                                    </svg>
+                                )}
+                              </div>
+                              <div>
+                                <p className={`font-medium ${isSelected ? "text-ink-50" : "text-ink-200"}`}>
+                                  {disk.name || "Local Disk"}
+                                </p>
+                                <p className="font-mono text-xs text-ink-400">{disk.mount_point}</p>
+                              </div>
+                            </div>
+                            {isSelected && (
+                                <div className="h-2 w-2 rounded-full bg-mint-400 shadow-[0_0_8px_#34d399]" />
+                            )}
+                          </div>
+
+                          <div className="w-full space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-medium uppercase tracking-wider text-ink-400">
+                              <span>Used</span>
+                              <span>{formatBytes(disk.available_space)} Free</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-900">
+                              <div
+                                  className={`h-full rounded-full transition-all duration-500 ${isSelected ? "bg-mint-500" : "bg-ink-500"}`}
+                                  style={{ width: `${usagePercent}%` }}
+                              />
+                            </div>
+                            <div className="text-right text-[10px] text-ink-500">
+                              Total: {formatBytes(disk.total_space)}
+                            </div>
+                          </div>
+                        </button>
+                    );
+                  })}
+                </div>
+            )}
+          </div>
+
+          {/* Right Column: Config */}
+          <div className="flex w-full flex-col justify-between gap-4 rounded-3xl bg-ink-800/30 p-6 ring-1 ring-white/5 lg:w-72">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-ink-400">
+                  {t("label.capacityLimit")}
+                </label>
+                <div className="relative group">
+                  <input
+                      className="w-full rounded-xl border border-ink-700 bg-ink-900/50 px-4 py-3 pr-12 text-sm text-ink-50 outline-none transition-all placeholder:text-ink-600 focus:border-sky-500/50 focus:bg-ink-900 focus:ring-4 focus:ring-sky-500/10 group-hover:border-ink-600"
+                      placeholder="0 = Full"
+                      value={limitMb}
+                      onChange={(event) => setLimitMb(event.target.value)}
+                      type="number"
+                      min="0"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-ink-500">MB</span>
+                </div>
+                <p className="text-[11px] text-ink-500">
+                  Leave empty or 0 to verify the entire available free space.
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm text-ink-300">
-                {t("label.capacityLimit")}
-              </label>
-              <input
-                className="field-input w-full px-4 py-3 text-sm text-ink-50 outline-none"
-                placeholder={t("placeholder.capacityLimit")}
-                value={limitMb}
-                onChange={(event) => setLimitMb(event.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+            <div className="flex gap-3 pt-4">
               <button
-                className="btn-danger-outline flex-1 rounded-2xl px-5 py-3 text-sm font-semibold"
-                onClick={handleStop}
-                disabled={!running}
+                  className="btn-primary relative flex-1 overflow-hidden rounded-xl py-4 text-sm font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleStart}
+                  disabled={running || !path}
               >
-                {t("button.stop")}
+                <span className="relative z-10">{t("button.startDiagnosis")}</span>
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-shimmer" />
               </button>
+
+              {running && (
+                  <button
+                      className="btn-danger-outline rounded-xl px-4"
+                      onClick={handleStop}
+                      title={t("button.stop")}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+              )}
             </div>
           </div>
-        </details>
-      </div>
-    </section>
+        </div>
+      </section>
   );
 };
 

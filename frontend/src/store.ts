@@ -22,6 +22,14 @@ export interface DiagnosisReport {
   conclusion: string;
 }
 
+export interface DiskInfo {
+  name: string;
+  mount_point: string;
+  total_space: number;
+  available_space: number;
+  is_removable: boolean;
+}
+
 interface DiagnosisState {
   path: string;
   limitMb: string;
@@ -36,6 +44,8 @@ interface DiagnosisState {
   report: DiagnosisReport | null;
   toast: string | null;
   language: Locale;
+  disks: DiskInfo[];
+  isScanningDisks: boolean;
   setPath: (path: string) => void;
   setLimitMb: (limitMb: string) => void;
   setRunning: (running: boolean) => void;
@@ -44,6 +54,8 @@ interface DiagnosisState {
   setReport: (report: DiagnosisReport | null) => void;
   setToast: (message: string | null) => void;
   setLanguage: (language: Locale) => void;
+  setDisks: (disks: DiskInfo[]) => void;
+  setScanningDisks: (isScanning: boolean) => void;
   reset: () => void;
 }
 
@@ -61,34 +73,38 @@ export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   report: null,
   toast: null,
   language: getInitialLocale(),
+  disks: [],
+  isScanningDisks: false,
   setPath: (path) => set({ path }),
   setLimitMb: (limitMb) => set({ limitMb }),
   setRunning: (running) => set({ running }),
   setStatus: (status) => set({ status }),
   updateProgress: (update) =>
-    set({
-      phase: update.phase,
-      progress: update.percent,
-      speedMbps: update.speed_mbps,
-      bytesWritten: update.bytes_written,
-      bytesVerified: update.bytes_verified,
-      totalBytes: update.total_bytes
-    }),
+      set({
+        phase: update.phase,
+        progress: update.percent,
+        speedMbps: update.speed_mbps,
+        bytesWritten: update.bytes_written,
+        bytesVerified: update.bytes_verified,
+        totalBytes: update.total_bytes
+      }),
   setReport: (report) => set({ report }),
   setToast: (toast) => set({ toast }),
   setLanguage: (language) => {
     persistLocale(language);
     set({ language });
   },
+  setDisks: (disks) => set({ disks }),
+  setScanningDisks: (isScanning) => set({ isScanningDisks: isScanning }),
   reset: () =>
-    set({
-      status: "idle",
-      phase: null,
-      progress: 0,
-      speedMbps: 0,
-      bytesWritten: 0,
-      bytesVerified: 0,
-      totalBytes: 0,
-      report: null
-    })
+      set({
+        status: "idle",
+        phase: null,
+        progress: 0,
+        speedMbps: 0,
+        bytesWritten: 0,
+        bytesVerified: 0,
+        totalBytes: 0,
+        report: null
+      })
 }));

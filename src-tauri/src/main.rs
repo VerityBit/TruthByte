@@ -3,6 +3,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use sysinfo::Disks;
 use tauri::{AppHandle, Emitter, State};
 use truthbyte::{AppConfig, DiagnosisReport, DriveInspector, EventSink, ProgressUpdate};
 
@@ -25,6 +26,15 @@ struct ErrorPayload {
     message: String,
 }
 
+#[derive(serde::Serialize)]
+struct SystemDisk {
+    name: String,
+    mount_point: String,
+    total_space: u64,
+    available_space: u64,
+    is_removable: bool,
+}
+
 struct TauriEventSink {
     app: AppHandle,
     locale: Locale,
@@ -32,15 +42,29 @@ struct TauriEventSink {
 
 impl EventSink for TauriEventSink {
     fn progress(&self, update: ProgressUpdate) {
-        // Frontend listens to PROGRESS_UPDATE for phase/percent/speed/bytes fields.
         let _ = self.app.emit(EVENT_PROGRESS, update);
     }
 
     fn error(&self, message: String) {
-        // Frontend listens to ERROR_OCCURRED with ErrorPayload { message }.
         let localized = localize_error(self.locale, &message);
         let _ = self.app.emit(EVENT_ERROR, ErrorPayload { message: localized });
     }
+}
+
+#[tauri::command]
+fn get_system_disks() -> Vec<SystemDisk> {
+    let disks = Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        .map(|disk| SystemDisk {
+            name: disk.name().to_string_lossy().into_owned(),
+            mount_point: disk.mount_point().to_string_lossy().into_owned(),
+            total_space: disk.total_space(),
+            available_space: disk.available_space(),
+            is_removable: disk.is_removable(),
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -127,7 +151,6 @@ async fn start_diagnosis(
             report.conclusion = localize_report_conclusion(locale, &report);
         }
 
-        // Frontend listens to DIAGNOSIS_COMPLETE with DiagnosisReport payload.
         let _ = sink.app.emit(EVENT_COMPLETE, report);
         running.store(false, Ordering::SeqCst);
         cancel_flag.store(false, Ordering::SeqCst);
@@ -150,7 +173,11 @@ async fn stop_diagnosis(state: State<'_, AppState>, locale: String) -> Result<()
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![start_diagnosis, stop_diagnosis])
+        .invoke_handler(tauri::generate_handler![
+            start_diagnosis,
+            stop_diagnosis,
+            get_system_disks
+        ])
         .plugin(tauri_plugin_dialog::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

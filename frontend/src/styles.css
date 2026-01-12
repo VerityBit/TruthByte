@@ -56,6 +56,38 @@ body {
   z-index: 1;
 }
 
+@layer utilities {
+  .animate-enter {
+    animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .glass-panel {
+    background: rgba(10, 15, 28, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @layer components {
   .panel {
     position: relative;
@@ -105,15 +137,19 @@ body {
   }
 
   .btn-primary {
-    background: linear-gradient(120deg, rgba(56, 189, 248, 0.95), rgba(34, 197, 94, 0.9));
+    background: linear-gradient(135deg, #38bdf8 0%, #3dd6b0 100%);
     color: #07101c;
     box-shadow: 0 10px 20px rgba(15, 23, 42, 0.35);
-    transition: transform 0.15s ease, filter 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .btn-primary:hover {
     filter: brightness(1.05);
     transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
   }
 
   .btn-primary:disabled {
