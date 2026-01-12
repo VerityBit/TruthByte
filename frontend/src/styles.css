@@ -51,7 +51,7 @@ body {
     radial-gradient(circle at 80% 30%, rgba(239, 68, 68, 0.12), transparent 50%);
 }
 
-.app-shell > * {
+.app-shell > *:not(.titlebar) {
   position: relative;
   z-index: 1;
 }
