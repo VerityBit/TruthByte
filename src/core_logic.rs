@@ -211,4 +211,32 @@ mod tests {
         data[10] = data[10].wrapping_add(1);
         assert_eq!(verify_block(offset, &data), Err(10));
     }
+
+    #[test]
+    fn test_partial_last_block_verification() {
+        let total_capacity: u64 = 1000;
+        let block_size: usize = 256;
+        let mut offset: u64 = 0;
+
+        while offset < total_capacity {
+            let remaining = total_capacity - offset;
+            let len = std::cmp::min(remaining, block_size as u64) as usize;
+            let mut data = vec![0u8; len];
+            fill_block(offset, &mut data);
+            assert!(verify_block(offset, &data).is_ok());
+            offset += len as u64;
+        }
+    }
+
+    #[test]
+    fn test_verify_block_reports_exact_index_on_bit_flip() {
+        let offset = 42;
+        let mut data = vec![0u8; 128];
+        fill_block(offset, &mut data);
+
+        let flip_index = 77;
+        data[flip_index] ^= 0x01;
+
+        assert_eq!(verify_block(offset, &data), Err(flip_index));
+    }
 }
