@@ -13,8 +13,6 @@ const DIRECT_IO_ALIGNMENT: usize = 4096;
 pub struct DriveInspector {
     file_path: String,
     block_size: usize,
-    quick_probe_enabled: bool,
-    quick_probe_steps: usize,
 }
 
 impl DriveInspector {
@@ -26,8 +24,6 @@ impl DriveInspector {
         Self {
             file_path: path.to_string(),
             block_size: config.block_size,
-            quick_probe_enabled: config.quick_probe_enabled,
-            quick_probe_steps: config.quick_probe_steps,
         }
     }
 }
