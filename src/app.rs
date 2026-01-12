@@ -14,6 +14,7 @@ pub struct RunOutcome {
 
 #[derive(Debug)]
 pub enum RunError {
+    QuickProbe(io::Error),
     Write(io::Error),
     Verify(io::Error),
 }
@@ -21,6 +22,7 @@ pub enum RunError {
 impl fmt::Display for RunError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            RunError::QuickProbe(err) => write!(f, "quick probe error: {}", err),
             RunError::Write(err) => write!(f, "write phase error: {}", err),
             RunError::Verify(err) => write!(f, "verify phase error: {}", err),
         }
@@ -30,6 +32,7 @@ impl fmt::Display for RunError {
 impl std::error::Error for RunError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            RunError::QuickProbe(err) => Some(err),
             RunError::Write(err) => Some(err),
             RunError::Verify(err) => Some(err),
         }
@@ -42,6 +45,17 @@ pub fn run_write_verify(
     config: AppConfig,
 ) -> Result<RunOutcome, RunError> {
     let inspector = DriveInspector::with_config(file_path, config);
+    if config.quick_probe_enabled {
+        if let Some(report) = inspector
+            .run_quick_probe_phase(limit_mb, config.quick_probe_steps)
+            .map_err(RunError::QuickProbe)?
+        {
+            return Ok(RunOutcome {
+                bytes_written: report.tested_bytes,
+                report,
+            });
+        }
+    }
     let bytes_written = inspector
         .run_write_phase(limit_mb)
         .map_err(RunError::Write)?;
@@ -183,6 +197,11 @@ pub fn run_cli(args: &[String]) -> i32 {
             }
         }
         Err(RunError::Write(e)) => {
+            let message = i18n::cli_write_phase_failed(locale);
+            println!("[ERROR] {}: {}", message, e);
+            2
+        }
+        Err(RunError::QuickProbe(e)) => {
             let message = i18n::cli_write_phase_failed(locale);
             println!("[ERROR] {}: {}", message, e);
             2
