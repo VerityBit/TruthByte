@@ -30,6 +30,26 @@ const SetupView = ({
                      handleStop,
                      setLimitMb
                    }: SetupViewProps) => {
+  const limitOptions = [
+    {
+      id: "quick",
+      value: "1024",
+      title: t("limit.quickTitle"),
+      detail: t("limit.quickDesc", { size: "1 GB", time: "~10s" })
+    },
+    {
+      id: "deep",
+      value: "deep",
+      title: t("limit.deepTitle"),
+      detail: t("limit.deepDesc", { size: "10 GB", percent: "10%" })
+    },
+    {
+      id: "full",
+      value: "0",
+      title: t("limit.fullTitle"),
+      detail: t("limit.fullDesc")
+    }
+  ];
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
@@ -147,23 +167,50 @@ const SetupView = ({
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-ink-400">
-                  {t("label.capacityLimit")}
+                  {t("label.scanMode")}
                 </label>
-                <div className="relative group">
-                  <input
-                      className="w-full rounded-xl border border-ink-700 bg-ink-900/50 px-4 py-3 pr-12 text-sm text-ink-50 outline-none transition-all placeholder:text-ink-600 focus:border-sky-500/50 focus:bg-ink-900 focus:ring-4 focus:ring-sky-500/10 group-hover:border-ink-600"
-                      placeholder="0 = Full"
-                      value={limitMb}
-                      onChange={(event) => setLimitMb(event.target.value)}
-                      type="number"
-                      min="0"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-ink-500">MB</span>
+                <div className="space-y-3">
+                  {limitOptions.map((option) => {
+                    const isSelected = limitMb === option.value;
+
+                    return (
+                      <label
+                        key={option.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-all ${
+                          isSelected
+                            ? "border-sky-500/50 bg-sky-500/10 shadow-[0_0_18px_rgba(56,189,248,0.12)]"
+                            : "border-ink-700 bg-ink-900/40 hover:border-ink-500 hover:bg-ink-900/70"
+                        } ${running ? "cursor-not-allowed opacity-60" : ""}`}
+                      >
+                        <input
+                          className="sr-only"
+                          type="radio"
+                          name="capacityLimit"
+                          value={option.value}
+                          checked={isSelected}
+                          onChange={() => setLimitMb(option.value)}
+                          disabled={running}
+                        />
+                        <span
+                          className={`mt-1 flex h-4 w-4 items-center justify-center rounded-full border ${
+                            isSelected ? "border-sky-400 bg-sky-400" : "border-ink-500"
+                          }`}
+                        >
+                          {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-ink-900" />}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-ink-50">{option.title}</p>
+                          <p className="text-[11px] text-ink-400">{option.detail}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
-                <p className="text-[11px] text-ink-500">
-                  Leave empty or 0 to verify the entire available free space.
-                </p>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-ember-500/40 bg-ember-500/10 px-4 py-2 text-[11px] font-semibold text-ember-200">
+              {t("setup.safetyPromise")}
             </div>
 
             <div className="flex gap-3 pt-4">

@@ -90,7 +90,20 @@ export function useDiagnosisController() {
             return;
         }
 
-        const parsedLimit = limitMb.trim() === "" ? 0 : Number(limitMb);
+        let parsedLimit: number;
+        if (limitMb === "deep") {
+            const selectedDisk = store.disks.find((disk) =>
+                store.path.startsWith(disk.mount_point)
+            );
+            if (selectedDisk) {
+                const totalMb = selectedDisk.total_space / (1024 * 1024);
+                parsedLimit = Math.max(1, Math.floor(Math.min(10240, totalMb * 0.1)));
+            } else {
+                parsedLimit = 10240;
+            }
+        } else {
+            parsedLimit = limitMb.trim() === "" ? 0 : Number(limitMb);
+        }
         if (Number.isNaN(parsedLimit) || parsedLimit < 0) {
             store.setToast("Invalid limit value");
             return;

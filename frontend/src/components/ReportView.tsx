@@ -14,9 +14,12 @@ const ReportView = ({
   numberFormatter,
   statusLabels
 }: ReportViewProps) => {
+  const isFakeCapacity = report?.status === "FakeCapacity";
   const glowClass = report
     ? report.status === "Healthy"
       ? "report-glow report-glow--good"
+      : isFakeCapacity
+      ? "report-glow report-glow--critical"
       : "report-glow report-glow--bad"
     : "report-glow";
   const score = report ? Math.max(0, Math.min(100, report.health_score)) : 0;
@@ -37,7 +40,7 @@ const ReportView = ({
     : t("status.awaitingResults");
 
   return (
-    <section className="panel p-8">
+    <section className={`panel p-8 ${isFakeCapacity ? "report-panel--critical" : ""}`}>
       <div className={glowClass} />
       <div className="relative z-10">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -59,6 +62,17 @@ const ReportView = ({
             </span>
           ) : null}
         </div>
+
+        {isFakeCapacity ? (
+          <div className="mt-6 rounded-2xl border border-ember-500/60 bg-ember-500/15 px-5 py-4">
+            <p className="text-sm uppercase tracking-[0.35em] text-ember-200">
+              {t("report.returnRecommendationEyebrow")}
+            </p>
+            <p className="mt-3 text-3xl font-semibold text-ember-100">
+              {t("report.returnRecommendation")}
+            </p>
+          </div>
+        ) : null}
 
         <div className="mt-10 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
           <div className="panel-card p-6">

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createTranslator, localeOptions } from "./i18n/index";
 import { useDiagnosisController } from "./hooks/useDiagnosisController";
 import SetupView from "./components/SetupView";
@@ -16,6 +16,7 @@ export default function App() {
   } = useDiagnosisController();
 
   const t = useMemo(() => createTranslator(language), [language]);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const numberFormatter = useMemo(
       () => new Intl.NumberFormat(language, { maximumFractionDigits: 1 }),
@@ -47,6 +48,16 @@ export default function App() {
 
   const currentView = running ? "progress" : report ? "report" : "setup";
   const reportMood = report ? (report.status === "Healthy" ? "good" : "bad") : "neutral";
+
+  const driveLabel = useMemo(() => {
+    if (!path) return t("modal.driveUnknown");
+    if (path.includes(":")) {
+      return path.slice(0, 1).toUpperCase();
+    }
+    const trimmed = path.replace(/^\/+/, "");
+    const root = trimmed.split(/[\\/]/)[0];
+    return root || t("modal.driveUnknown");
+  }, [path, t]);
 
   return (
       <div className={`app-shell min-h-screen pb-8 pt-[calc(var(--titlebar-height)+32px)] text-ink-50 selection:bg-mint-500/30 selection:text-mint-100 report-${reportMood}`}>
@@ -101,7 +112,7 @@ export default function App() {
                     isScanning={isScanningDisks}
                     handleScan={scanDisks}
                     handleSelectDisk={selectDisk}
-                    handleStart={() => startDiagnosis(limitMb, language)}
+                    handleStart={() => setIsConfirmOpen(true)}
                     handleStop={() => stopDiagnosis(language)}
                     setLimitMb={setLimitMb}
                 />
@@ -138,6 +149,42 @@ export default function App() {
           </div>
 
         </main>
+
+        {isConfirmOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center px-6">
+            <div
+              className="absolute inset-0 bg-ink-900/70 backdrop-blur-sm"
+              onClick={() => setIsConfirmOpen(false)}
+            />
+            <div className="relative w-full max-w-md rounded-3xl border border-ink-700 bg-ink-900/95 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.6)]">
+              <h3 className="text-lg font-semibold text-ink-50">
+                {t("modal.startConfirmTitle")}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-300">
+                {t("modal.startConfirmBody", { drive: driveLabel })}
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary flex-1 rounded-xl px-4 py-3 text-sm font-semibold"
+                  onClick={() => setIsConfirmOpen(false)}
+                >
+                  {t("button.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex-1 rounded-xl px-4 py-3 text-sm font-semibold"
+                  onClick={() => {
+                    setIsConfirmOpen(false);
+                    startDiagnosis(limitMb, language);
+                  }}
+                >
+                  {t("button.startDiagnosis")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className={`fixed bottom-8 left-1/2 z-50 -translate-x-1/2 transition-all duration-300 ${toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"}`}>
           <div className="flex items-center gap-3 rounded-2xl border border-ember-500/20 bg-ink-900/95 px-6 py-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl">

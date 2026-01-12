@@ -61,7 +61,7 @@ interface DiagnosisState {
 
 export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   path: "",
-  limitMb: "",
+  limitMb: "deep",
   running: false,
   status: "idle",
   phase: null,
