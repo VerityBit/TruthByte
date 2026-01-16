@@ -47,79 +47,68 @@ export default function App() {
   };
 
   const currentView = running ? "progress" : report ? "report" : "setup";
-  const reportMood = report ? (report.status === "Healthy" ? "good" : "bad") : "neutral";
-
-  const driveLabel = useMemo(() => {
-    if (!path) return t("modal.driveUnknown");
-    if (path.includes(":")) {
-      return path.slice(0, 1).toUpperCase();
-    }
-    const trimmed = path.replace(/^\/+/, "");
-    const root = trimmed.split(/[\\/]/)[0];
-    return root || t("modal.driveUnknown");
-  }, [path, t]);
+  const driveLabel = path || t("modal.driveUnknown");
 
   return (
-      <div className={`app-shell min-h-screen pb-8 pt-[calc(var(--titlebar-height)+32px)] text-ink-50 selection:bg-mint-500/30 selection:text-mint-100 report-${reportMood}`}>
+      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-50 selection:bg-sky-500/30">
+
+        {}
         <TitleBar />
 
-        <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 transition-all duration-500 ease-out">
+        {}
+        {}
+        <main
+            className="flex-1 overflow-hidden flex flex-col pt-[var(--titlebar-height)]"
+            style={{ height: "100vh" }}
+        >
 
-          <header className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full transition-colors duration-500 ${running ? "bg-sky-400 shadow-[0_0_10px_#38bdf8]" : "bg-ink-600"}`}></div>
-                <p className="font-mono text-xs uppercase tracking-[0.3em] text-ink-400 transition-colors hover:text-ink-300">
-                  {t("app.title")} v1.0
-                </p>
-              </div>
-
-              <div className="relative">
-                <select
-                    className="cursor-pointer appearance-none rounded-lg bg-ink-800/50 py-1.5 pl-3 pr-8 text-xs font-medium text-ink-300 ring-1 ring-white/5 transition-colors hover:bg-ink-800 hover:text-ink-100 focus:outline-none focus:ring-sky-500/50"
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value as any)}
-                >
-                  {localeOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
-                </div>
-              </div>
+          {}
+          <div className="shrink-0 h-14 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-semibold ${running ? "text-sky-400" : "text-slate-400"}`}>
+                {running ? "System Busy" : "System Ready"}
+              </span>
+              {running && <span className="flex h-2 w-2 rounded-full bg-sky-400 animate-pulse" />}
             </div>
 
-            <div className="mt-4 space-y-2">
-              <h1 className="bg-gradient-to-br from-white to-ink-400 bg-clip-text text-4xl font-bold tracking-tight text-transparent">
-                {t("app.heading")}
-              </h1>
-              <p className="max-w-2xl text-base text-ink-400">
-                {t("app.subheading")}
-              </p>
+            {}
+            <div className="relative group">
+              <select
+                  className="appearance-none bg-transparent text-xs font-mono text-slate-500 hover:text-slate-300 uppercase cursor-pointer pr-4 focus:outline-none"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as any)}
+              >
+                {localeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-slate-800 text-slate-300">
+                      {opt.label}
+                    </option>
+                ))}
+              </select>
             </div>
-          </header>
+          </div>
 
-          <div className="relative min-h-[400px]">
-            {currentView === "setup" && (
-                <SetupView
-                    t={t}
-                    running={running}
-                    statusLabel={statusLabel}
-                    path={path}
-                    limitMb={limitMb}
-                    disks={disks}
-                    isScanning={isScanningDisks}
-                    handleScan={scanDisks}
-                    handleSelectDisk={selectDisk}
-                    handleStart={() => setIsConfirmOpen(true)}
-                    handleStop={() => stopDiagnosis(language)}
-                    setLimitMb={setLimitMb}
-                />
-            )}
+          {}
+          <div className="flex-1 p-6 flex flex-col overflow-hidden">
+            <div className="mx-auto w-full max-w-5xl flex-1 flex flex-col transition-all duration-300">
 
-            {currentView === "progress" && (
-                <div className="animate-enter">
+              {currentView === "setup" && (
+                  <SetupView
+                      t={t}
+                      running={running}
+                      statusLabel={statusLabel}
+                      path={path}
+                      limitMb={limitMb}
+                      disks={disks}
+                      isScanning={isScanningDisks}
+                      handleScan={scanDisks}
+                      handleSelectDisk={selectDisk}
+                      handleStart={() => setIsConfirmOpen(true)}
+                      handleStop={() => stopDiagnosis(language)}
+                      setLimitMb={setLimitMb}
+                  />
+              )}
+
+              {currentView === "progress" && (
                   <ProgressView
                       t={t}
                       status={status}
@@ -133,65 +122,59 @@ export default function App() {
                       totalBytes={totalBytes}
                       handleStop={() => stopDiagnosis(language)}
                   />
-                </div>
-            )}
+              )}
 
-            {currentView === "report" && (
-                <div className="animate-enter">
+              {currentView === "report" && (
                   <ReportView
                       t={t}
                       report={report}
                       numberFormatter={numberFormatter}
                       statusLabels={statusLabels}
                   />
-                </div>
-            )}
+              )}
+            </div>
           </div>
-
         </main>
 
+        {}
         {isConfirmOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center px-6">
-            <div
-              className="absolute inset-0 bg-ink-900/70 backdrop-blur-sm"
-              onClick={() => setIsConfirmOpen(false)}
-            />
-            <div className="relative w-full max-w-md rounded-3xl border border-ink-700 bg-ink-900/95 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.6)]">
-              <h3 className="text-lg font-semibold text-ink-50">
-                {t("modal.startConfirmTitle")}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-ink-300">
-                {t("modal.startConfirmBody", { drive: driveLabel })}
-              </p>
-              <div className="mt-6 flex gap-3">
-                <button
-                  type="button"
-                  className="btn-secondary flex-1 rounded-xl px-4 py-3 text-sm font-semibold"
-                  onClick={() => setIsConfirmOpen(false)}
-                >
-                  {t("button.cancel")}
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary flex-1 rounded-xl px-4 py-3 text-sm font-semibold"
-                  onClick={() => {
-                    setIsConfirmOpen(false);
-                    startDiagnosis(limitMb, language);
-                  }}
-                >
-                  {t("button.startDiagnosis")}
-                </button>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsConfirmOpen(false)} />
+              <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg p-6 shadow-2xl">
+                <h3 className="text-lg font-bold text-slate-100 mb-2">
+                  {t("modal.startConfirmTitle")}
+                </h3>
+                <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                  {t("modal.startConfirmBody", { drive: driveLabel })}
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                      type="button"
+                      className="btn-secondary px-4 py-2 text-sm"
+                      onClick={() => setIsConfirmOpen(false)}
+                  >
+                    {t("button.cancel")}
+                  </button>
+                  <button
+                      type="button"
+                      className="btn-primary px-4 py-2 text-sm"
+                      onClick={() => {
+                        setIsConfirmOpen(false);
+                        startDiagnosis(limitMb, language);
+                      }}
+                  >
+                    {t("button.startDiagnosis")}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
         )}
 
-        <div className={`fixed bottom-8 left-1/2 z-50 -translate-x-1/2 transition-all duration-300 ${toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"}`}>
-          <div className="flex items-center gap-3 rounded-2xl border border-ember-500/20 bg-ink-900/95 px-6 py-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-ember-500/10">
-              <span className="text-ember-400">!</span>
-            </div>
-            <span className="text-sm font-medium text-ink-100">{toast}</span>
+        {}
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 ${toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"}`}>
+          <div className="flex items-center gap-3 rounded bg-slate-800 border border-slate-600 px-4 py-3 shadow-xl">
+            <span className="text-amber-400">⚠️</span>
+            <span className="text-sm font-medium text-slate-200">{toast}</span>
           </div>
         </div>
       </div>

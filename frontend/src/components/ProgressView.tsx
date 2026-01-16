@@ -15,134 +15,93 @@ type ProgressViewProps = {
 };
 
 const ProgressView = ({
-  t,
-  status,
-  phase,
-  displayProgress,
-  numberFormatter,
-  bytesWritten,
-  bytesVerified,
-  speedMbps,
-  etaSeconds,
-  totalBytes,
-  handleStop
-}: ProgressViewProps) => {
-  const ringRadius = 118;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const progressOffset =
-    ringCircumference - (Math.min(displayProgress, 100) / 100) * ringCircumference;
-  const isIndeterminate = totalBytes <= 0;
-  const ringClass =
-    status === "cancelled" ? "progress-ring__value--cancelled" : "progress-ring__value";
+                        t,
+                        status,
+                        phase,
+                        displayProgress,
+                        numberFormatter,
+                        bytesWritten,
+                        bytesVerified,
+                        speedMbps,
+                        etaSeconds,
+                        totalBytes,
+                        handleStop
+                      }: ProgressViewProps) => {
+
+  const phaseLabel = phase === "write" ? "WRITING DATA"
+      : phase === "verify" ? "VERIFYING INTEGRITY"
+          : "PREPARING";
 
   return (
-    <section className="panel p-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">{t("section.liveDashboard")}</h2>
-        <span className="text-xs uppercase tracking-[0.25em] text-ink-400">
-          {phase ? t(`phase.${phase}`) : t("phase.standby")}
-        </span>
-      </div>
+      
+      <section className="panel h-full min-h-[500px] flex flex-col items-center justify-center p-8 relative overflow-hidden">
 
-      {status === "cancelled" ? (
-        <div className="mt-4 rounded-2xl border border-ember-500/50 bg-ember-500/10 px-4 py-3 text-sm text-ember-200">
-          {t("banner.cancelled")}
+        {}
+        <div className="absolute top-0 left-0 right-0 h-12 border-b border-slate-700 bg-slate-800/50 flex items-center justify-between px-6">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${status === "running" ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}></div>
+            <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                {status === "cancelled" ? "CANCELLED" : phaseLabel}
+            </span>
+          </div>
+          <div className="text-xs font-mono text-slate-500">
+            {}
+          </div>
         </div>
-      ) : null}
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[1.1fr_1fr]">
-        <div className="flex items-center justify-center">
-          <div className="relative flex h-[320px] w-[320px] items-center justify-center">
-            <div className="heartbeat-glow" />
-            <svg
-              className={`progress-ring ${isIndeterminate ? "progress-ring--indeterminate" : ""}`}
-              width="320"
-              height="320"
-              viewBox="0 0 320 320"
-            >
-              <defs>
-                <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#38bdf8" />
-                  <stop offset="55%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#a7f3d0" />
-                </linearGradient>
-              </defs>
-              <circle
-                className="progress-ring__track"
-                cx="160"
-                cy="160"
-                r={ringRadius}
-                strokeWidth="16"
+        {}
+        <div className="w-full max-w-2xl flex flex-col items-center gap-8 z-10">
+
+          {}
+          <div className="text-center">
+            <h1 className="text-7xl md:text-8xl font-mono font-bold text-slate-100 tracking-tighter tabular-nums">
+              {totalBytes > 0 ? numberFormatter.format(displayProgress) : "0.0"}
+              <span className="text-2xl text-slate-500 ml-2">%</span>
+            </h1>
+          </div>
+
+          {}
+          <div className="w-full space-y-2">
+            <div className="h-6 w-full bg-slate-800 rounded border border-slate-700 overflow-hidden relative">
+              <div
+                  className="h-full bg-sky-500 transition-all duration-300 ease-out"
+                  style={{ width: `${Math.min(displayProgress, 100)}%` }}
               />
-              <circle
-                className={ringClass}
-                cx="160"
-                cy="160"
-                r={ringRadius}
-                strokeWidth="16"
-                strokeDasharray={ringCircumference}
-                strokeDashoffset={progressOffset}
-              />
-            </svg>
-            <div className="absolute text-center">
-              <p className="text-xs uppercase tracking-[0.3em] text-ink-400">
-                {t("progress.title")}
-              </p>
-              <p className="mt-3 text-4xl font-semibold text-ink-50">
-                {totalBytes > 0
-                  ? `${numberFormatter.format(displayProgress)}%`
-                  : t("progress.unlimited")}
-              </p>
-              <p className="mt-3 font-mono text-xs text-ink-400">
-                {t("progress.detail", {
-                  written: byteFormatter(numberFormatter, bytesWritten),
-                  verified: byteFormatter(numberFormatter, bytesVerified)
-                })}
-              </p>
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+            </div>
+            <div className="flex justify-between text-xs font-mono text-slate-400 uppercase">
+              <span>Processed: {byteFormatter(numberFormatter, phase === "write" ? bytesWritten : bytesVerified)}</span>
+              <span>Total: {totalBytes > 0 ? byteFormatter(numberFormatter, totalBytes) : "Calculating..."}</span>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col items-center justify-center gap-6 text-center">
-          <div className="metric-card w-full max-w-sm px-6 py-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-              {t("metric.speed")}
-            </p>
-            <p className="mt-3 text-4xl font-semibold">
-              {numberFormatter.format(speedMbps)}
-              <span className="text-base font-normal text-ink-300">
-                {t("metric.unit.mbps")}
-              </span>
-            </p>
+          {}
+          <div className="grid grid-cols-2 gap-4 w-full mt-4">
+            <div className="bg-slate-800/50 border border-slate-700 p-4 rounded flex flex-col items-center">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Current Speed</span>
+              <span className="text-2xl font-mono text-sky-400 font-semibold tabular-nums">
+                    {numberFormatter.format(speedMbps)} <span className="text-sm text-slate-500">MB/s</span>
+                </span>
+            </div>
+
+            <div className="bg-slate-800/50 border border-slate-700 p-4 rounded flex flex-col items-center">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Time Remaining</span>
+              <span className="text-2xl font-mono text-emerald-400 font-semibold tabular-nums">
+                    {etaSeconds !== null ? timeFormatter(etaSeconds) : "--:--"}
+                </span>
+            </div>
           </div>
-          <div className="metric-card w-full max-w-sm px-6 py-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-              {t("metric.eta")}
-            </p>
-            <p className="mt-3 text-3xl font-semibold">
-              {timeFormatter(etaSeconds)}
-            </p>
-          </div>
-          <div className="metric-card w-full max-w-sm px-6 py-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-              {t("metric.target")}
-            </p>
-            <p className="mt-3 text-2xl font-semibold text-ink-100">
-              {totalBytes > 0
-                ? byteFormatter(numberFormatter, totalBytes)
-                : t("metric.fullCapacity")}
-            </p>
-          </div>
+
+          {}
           <button
-            className="btn-danger-outline mt-2 rounded-2xl px-6 py-3 text-sm font-semibold"
-            onClick={handleStop}
-            type="button"
+              onClick={handleStop}
+              className="mt-4 px-8 py-2 text-sm font-bold text-rose-400 border border-rose-900/50 hover:bg-rose-900/20 hover:text-rose-300 rounded transition-colors uppercase tracking-wider"
           >
-            {t("button.stop")}
+            {status === "cancelled" ? "Return to Menu" : "Abort Operation"}
           </button>
+
         </div>
-      </div>
-    </section>
+      </section>
   );
 };
 

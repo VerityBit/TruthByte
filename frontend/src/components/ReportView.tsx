@@ -1,5 +1,5 @@
 import { DiagnosisReport } from "../store";
-import { byteFormatter, statusStyles, Translator } from "./diagnosisUtils";
+import { byteFormatter, Translator } from "./diagnosisUtils";
 
 type ReportViewProps = {
   t: Translator;
@@ -14,148 +14,117 @@ const ReportView = ({
   numberFormatter,
   statusLabels
 }: ReportViewProps) => {
-  const isFakeCapacity = report?.status === "FakeCapacity";
-  const glowClass = report
-    ? report.status === "Healthy"
-      ? "report-glow report-glow--good"
-      : isFakeCapacity
-      ? "report-glow report-glow--critical"
-      : "report-glow report-glow--bad"
-    : "report-glow";
+
+  const status = report?.status || "Healthy";
+  const isHealthy = status === "Healthy";
+  const isFake = status === "FakeCapacity";
+
+  const theme = isHealthy
+      ? { bg: "bg-emerald-900/30", border: "border-emerald-500/50", text: "text-emerald-400", title: "VERIFIED AUTHENTIC" }
+      : isFake
+          ? { bg: "bg-rose-900/30", border: "border-rose-500/50", text: "text-rose-400", title: "FAKE DRIVE DETECTED" }
+          : { bg: "bg-amber-900/30", border: "border-amber-500/50", text: "text-amber-400", title: "DRIVE MALFUNCTION" };
+
   const score = report ? Math.max(0, Math.min(100, report.health_score)) : 0;
-  const gaugeProgress = score / 100;
-  const testedBytes = report ? report.tested_bytes : 0;
-  const invalidBytes = report ? Math.max(report.tested_bytes - report.valid_bytes, 0) : 0;
-  const badRatio = testedBytes > 0 ? invalidBytes / testedBytes : 0;
-  const badCells = Math.min(100, Math.max(0, Math.round(badRatio * 100)));
-  const gridCells = Array.from({ length: 100 }, (_, index) => index < badCells);
-  const headline = report
-    ? report.status === "FakeCapacity"
-      ? t("report.alert.fakeCapacity")
-      : report.status === "PhysicalCorruption"
-      ? t("report.alert.physicalCorruption")
-      : report.status === "DataLoss"
-      ? t("report.alert.dataLoss")
-      : t("report.alert.healthy")
-    : t("status.awaitingResults");
 
   return (
-    <section className={`panel p-8 ${isFakeCapacity ? "report-panel--critical" : ""}`}>
-      <div className={glowClass} />
-      <div className="relative z-10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-ink-400">
-              {t("section.diagnosisReport")}
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold text-ink-50">
-              {headline}
-            </h2>
-          </div>
-          {report ? (
-            <span
-              className={`rounded-full border px-3 py-1 text-xs ${
-                statusStyles[report.status]
-              }`}
-            >
-              {statusLabels[report.status]}
-            </span>
-          ) : null}
+      
+      <section className="panel h-full min-h-[500px] flex flex-col relative overflow-hidden">
+
+        {}
+        <div className="h-12 border-b border-slate-700 bg-slate-800/50 flex items-center justify-between px-6 shrink-0">
+        <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+          Diagnosis Report
+        </span>
+          <span className="text-xs font-mono text-slate-500">
+          ID: {new Date().toLocaleTimeString()}
+        </span>
         </div>
 
-        {isFakeCapacity ? (
-          <div className="mt-6 rounded-2xl border border-ember-500/60 bg-ember-500/15 px-5 py-4">
-            <p className="text-sm uppercase tracking-[0.35em] text-ember-200">
-              {t("report.returnRecommendationEyebrow")}
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-ember-100">
-              {t("report.returnRecommendation")}
-            </p>
-          </div>
-        ) : null}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="max-w-3xl mx-auto space-y-8">
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-          <div className="panel-card p-6">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-10">
-              <div className="gauge">
-                <svg viewBox="0 0 220 120" className="gauge__svg">
-                  <defs>
-                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#f87171" />
-                      <stop offset="55%" stopColor="#facc15" />
-                      <stop offset="100%" stopColor="#34d399" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    className="gauge__track"
-                    d="M10 110 A100 100 0 0 1 210 110"
-                  />
-                  <path
-                    className="gauge__value"
-                    d="M10 110 A100 100 0 0 1 210 110"
-                    style={{ strokeDashoffset: `${(1 - gaugeProgress) * 314}` }}
-                  />
-                </svg>
-                <div className="gauge__label">
-                  <p className="text-xs uppercase tracking-[0.25em] text-ink-400">
-                    {t("report.healthScore")}
-                  </p>
-                  <p className="mt-3 text-5xl font-semibold text-ink-50">
-                    {report ? numberFormatter.format(score) : "--"}
-                    <span className="text-lg font-normal text-ink-300">/100</span>
-                  </p>
+            {}
+            <div className={`rounded-lg border-2 p-6 md:p-8 text-center ${theme.bg} ${theme.border}`}>
+              <h1 className={`text-3xl md:text-5xl font-black tracking-tight uppercase ${theme.text}`}>
+                {report ? theme.title : "WAITING FOR RESULTS..."}
+              </h1>
+              <p className="mt-4 text-slate-300 font-medium max-w-xl mx-auto">
+                {report?.conclusion || "Diagnosis is complete. Please review the statistics below."}
+              </p>
+
+              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1 rounded bg-slate-900/50 border border-slate-700">
+                <span className="text-xs uppercase text-slate-400 tracking-wider">Integrity Score</span>
+                <span className={`font-mono font-bold ${score === 100 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {score}/100
+                    </span>
+              </div>
+            </div>
+
+            {}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest mb-4 border-b border-slate-700 pb-2">
+                  Capacity Analysis
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-slate-400">Total Declared</span>
+                    <span className="font-mono text-slate-200">
+                                {report ? byteFormatter(numberFormatter, report.total_capacity) : "--"}
+                            </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-slate-400">Actual Valid</span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                                {report ? byteFormatter(numberFormatter, report.valid_bytes) : "--"}
+                            </span>
+                  </div>
+                  {isFake && (
+                      <div className="flex justify-between items-baseline pt-2 border-t border-slate-700/50">
+                        <span className="text-sm text-rose-400 font-bold">Oversold By</span>
+                        <span className="font-mono text-rose-400 font-bold">
+                                    {report ? byteFormatter(numberFormatter, Math.max(0, report.total_capacity - report.valid_bytes)) : "--"}
+                                </span>
+                      </div>
+                  )}
                 </div>
               </div>
-              <p className="text-base text-ink-200">
-                {report ? report.conclusion : t("report.placeholder")}
-              </p>
-            </div>
-          </div>
 
-          <div className="panel-card p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-              {t("report.errorSampleAnalysis")}
-            </p>
-            <div className="mt-4 space-y-2 text-sm text-ink-200">
-              <p>
-                {t("report.testedBytes")}:{" "}
-                {report
-                  ? byteFormatter(numberFormatter, report.tested_bytes)
-                  : "--"}
-              </p>
-              <p>
-                {t("report.validBytes")}:{" "}
-                {report
-                  ? byteFormatter(numberFormatter, report.valid_bytes)
-                  : "--"}
-              </p>
-              <p>
-                {t("report.errorCount")}: {report ? report.error_count : "--"}
-              </p>
-              <p>
-                {t("report.totalCapacity")}:{" "}
-                {report
-                  ? byteFormatter(numberFormatter, report.total_capacity)
-                  : "--"}
-              </p>
-            </div>
-            <div className="mt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-ink-400">
-                {t("report.blockMap")}
-              </p>
-              <div className="block-grid mt-3">
-                {gridCells.map((isBad, index) => (
-                  <span
-                    key={`${index}`}
-                    className={`block-cell ${isBad ? "block-cell--bad" : "block-cell--good"}`}
-                  />
-                ))}
+              <div>
+                <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest mb-4 border-b border-slate-700 pb-2">
+                  Error Statistics
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-slate-400">Data Corrupted</span>
+                    <span className={`font-mono ${report?.error_count ? "text-rose-400 font-bold" : "text-slate-200"}`}>
+                                {report ? report.error_count : 0} Files / Blocks
+                            </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-slate-400">Tested Region</span>
+                    <span className="font-mono text-slate-200">
+                                {report ? byteFormatter(numberFormatter, report.tested_bytes) : "--"}
+                            </span>
+                  </div>
+                </div>
               </div>
             </div>
+
           </div>
         </div>
-      </div>
-    </section>
+
+        {}
+        <div className="p-4 border-t border-slate-700 bg-slate-800/30 flex justify-end gap-3 shrink-0">
+          <button className="btn-secondary px-6 py-2 text-sm">
+            Close
+          </button>
+          <button className="btn-primary px-6 py-2 text-sm">
+            Export Report
+          </button>
+        </div>
+      </section>
   );
 };
 
